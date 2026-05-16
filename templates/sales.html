@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>💰 Продажи</h2>
+        <form method="POST" action="{{ url_for('sync_sales') }}" class="d-inline">
+            <div class="input-group">
+                <select name="days" class="form-select" style="max-width: 120px;">
+                    <option value="1">1 день</option>
+                    <option value="7" selected>7 дней</option>
+                    <option value="30">30 дней</option>
+                </select>
+                <button type="submit" class="btn btn-primary">🔄 Синхронизировать</button>
+            </div>
+        </form>
+    </div>
+    {% if month_total > 0 %}
+    <div class="alert alert-success mb-4"><h5 class="mb-1">📈 Продажи за месяц</h5><p class="mb-0 display-6">{{ "%.0f"|format(month_total) }} ₽</p></div>
+    {% endif %}
+    {% if daily %}
+    <div class="card mb-4">
+        <div class="card-header bg-light"><h5 class="mb-0">📊 Дневная динамика</h5></div>
+        <div class="card-body p-0">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light"><tr><th>Дата</th><th class="text-end">Заказов</th><th class="text-end">Сумма</th></tr></thead>
+                <tbody>
+                    {% for d in daily %}
+                    <tr><td>{{ d.date.strftime('%d.%m.%Y') if d.date else '-' }}</td><td class="text-end">{{ d.total_orders }}</td><td class="text-end fw-bold">{{ "%.2f"|format(d.total_sum) }} ₽</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info"><h5>ℹ️ Продажи не загружены</h5><p>Выберите период и нажмите «Синхронизировать»</p></div>
+    {% endif %}
+</div>
+{% endblock %}

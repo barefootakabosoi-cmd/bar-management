@@ -839,3 +839,160 @@ def sbis_document_detail(id):
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)
+
+# ==================== ОСТАТКИ (КЕГИ) ====================
+
+@app.route('/stock')
+def stock():
+    """Остатки на складе"""
+    balances = StockBalance.query.order_by(StockBalance.quantity).all()
+    
+    totals = {}
+    for bal in balances:
+        key = bal.name or 'Неизвестно'
+        if key not in totals:
+            totals[key] = {'total': 0, 'unit': bal.unit or 'шт'}
+        totals[key]['total'] += bal.quantity or 0
+    
+    return render_template('stock.html', balances=balances, totals=totals)
+
+@app.route('/stock/sync', methods=['POST'])
+def sync_stock():
+    """Синхронизация остатков со СБИС"""
+    try:
+        sbis = create_sbis_api_from_config(app.config)
+        
+        balances_data = sbis.get_balances(
+            warehouses=[Config.SBIS_WAREHOUSE_ID] if Config.SBIS_WAREHOUSE_ID else None,
+            companies=[Config.SBIS_COMPANY_ID] if Config.SBIS_COMPANY_ID else None
+        )
+        
+        if not balances_data:
+            flash('Не удалось получить остатки. Проверьте настройки SBIS_*_ID', 'warning')
+            return redirect(url_for('stock'))
+        
+        StockBalance.query.delete()
+        
+        balances_list = balances_data.get('balances', []) if isinstance(balances_data, dict) else balances_data
+        
+        for bal_data in balances_list:
+            name = bal_data.get('name', bal_data.get('Номенклатура', ''))
+            
+            balance = StockBalance(
+                sbis_nomenclature_id=str(bal_data.get('id', '')),
+                sbis_warehouse_id=str(bal_data.get('warehouseId', Config.SBIS_WAREHOUSE_ID or '')),
+                name=name,
+                normalized_name=name.lower(),
+                quantity=float(bal_data.get('quantity', bal_data.get('Количество', 0)) or 0),
+                unit=bal_data.get('unit', bal_data.get('Единица', ''))
+            )
+            db.session.add(balance)
+        
+        db.session.commit()
+        flash(f'Остатки синхронизированы: {len(balances_list)} позиций', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Ошибка синхронизации остатков: {str(e)}', 'error')
+    
+    return redirect(url_for('stock'))
+
+# ==================== ПРОДАЖИ ====================
+
+@app.route('/sales')
+def sales():
+    """Продажи"""
+    page = request.args.get('page', 1, type=int)
+    
+    pagination = SaleRecord.query.order_by(SaleRecord.date.desc()).paginate(
+        page=page, per_page=20, error_out=False
+    )
+    
+    daily = DailySalesSummary.query.order_by(DailySalesSummary.date.desc()).limit(30).all()
+    
+    return render_template('sales.html', pagination=pagination, daily=daily)
+
+@app.route('/sales/sync', methods=['POST'])
+def sync_sales():
+    """Синхронизация продаж со СБИС"""
+    try:
+        days = int(request.form.get('days', 7))
+        
+        sbis = create_sbis_api_from_config(app.config)
+        
+        orders = sbis.get_sales_by_period(
+            point_id=Config.SBIS_POINT_ID if Config.SBIS_POINT_ID else None,
+            days=days
+        )
+        
+        if not orders:
+            flash('Нет продаж за период или ошибка API', 'warning')
+            return redirect(url_for('sales'))
+        
+        imported = 0
+        
+        for order_data in orders:
+            order_id = str(order_data.get('id', ''))
+            if not order_id:
+                continue
+            
+            sale = SaleRecord.query.filter_by(sbis_order_id=order_id).first()
+            if not sale:
+                sale = SaleRecord(sbis_order_id=order_id)
+                db.session.add(sale)
+            
+            sale.order_number = order_data.get('number', '')
+            
+            date_str = order_data.get('dateTime', order_data.get('date', ''))
+            if date_str:
+                try:
+                    sale.date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                except:
+                    sale.date = None
+            
+            sale.point_id = str(order_data.get('pointId', Config.SBIS_POINT_ID or ''))
+            sale.total_sum = float(order_data.get('sum', 0) or 0)
+            sale.total_sum_with_vat = float(order_data.get('sumWithVat', sale.total_sum) or 0)
+            sale.status = order_data.get('status', '')
+            sale.items_json = order_data.get('items', order_data.get('products', []))
+            
+            imported += 1
+            
+            if imported % 50 == 0:
+                db.session.commit()
+        
+        db.session.commit()
+        
+        _recalculate_daily_sales()
+        
+        flash(f'Импортировано {imported} заказов', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Ошибка синхронизации продаж: {str(e)}', 'error')
+    
+    return redirect(url_for('sales'))
+
+def _recalculate_daily_sales():
+    """Пересчёт дневных агрегатов продаж"""
+    from sqlalchemy import func, cast, Date
+    
+    DailySalesSummary.query.delete()
+    
+    daily_data = db.session.query(
+        cast(SaleRecord.date, Date).label('sale_date'),
+        func.count(SaleRecord.id).label('orders'),
+        func.sum(SaleRecord.total_sum).label('total'),
+        func.sum(SaleRecord.total_sum_with_vat).label('total_vat')
+    ).filter(SaleRecord.date != None).group_by('sale_date').all()
+    
+    for row in daily_data:
+        summary = DailySalesSummary(
+            date=row.sale_date,
+            total_orders=row.orders or 0,
+            total_sum=row.total or 0,
+            total_sum_with_vat=row.total_vat or 0
+        )
+        db.session.add(summary)
+    
+    db.session.commit()

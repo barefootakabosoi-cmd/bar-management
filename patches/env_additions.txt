@@ -1,0 +1,6 @@
+# Добавить в .env:
+SBIS_POINT_ID=your-point-id
+SBIS_WAREHOUSE_ID=your-warehouse-id
+SBIS_COMPANY_ID=your-company-id
+SBIS_PRICE_LIST_ID=your-price-list-id
+ESTIMATED_MONTHLY_SALES=1000
