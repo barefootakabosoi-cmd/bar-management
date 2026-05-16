@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>📦 Остатки на складе</h2>
+        <form method="POST" action="{{ url_for('sync_stock') }}" class="d-inline">
+            <button type="submit" class="btn btn-primary">🔄 Синхронизировать со СБИС</button>
+        </form>
+    </div>
+    {% if totals %}
+    <div class="card mb-4">
+        <div class="card-header bg-light"><h5 class="mb-0">📊 Сводка</h5></div>
+        <div class="card-body p-0">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light"><tr><th>Номенклатура</th><th class="text-end">Количество</th><th>Ед. изм.</th></tr></thead>
+                <tbody>
+                    {% for name, data in totals.items()|sort %}
+                    <tr><td>{{ name }}</td><td class="text-end fw-bold">{{ "%.2f"|format(data.total) }}</td><td><span class="badge bg-secondary">{{ data.unit }}</span></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info"><h5>ℹ️ Остатки не загружены</h5><p>Нажмите «Синхронизировать со СБИС»</p></div>
+    {% endif %}
+</div>
+{% endblock %}
