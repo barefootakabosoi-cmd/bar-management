@@ -26,7 +26,7 @@
                     <td>{{ d.doc_number }}</td>
                     <td>{{ d.doc_date.strftime('%d.%m.%Y') if d.doc_date else '-' }}</td>
                     <td>{{ d.supplier.name if d.supplier else '-' }}</td>
-                    <td>{{ "%.0f".format(d.total_amount) }} ₽</td>
+                    <td>{{ "%.0f"|format(d.total_amount) }} ₽</td>
                     <td>{{ d.total_items }}</td>
                     <td>{{ d.synced_at.strftime('%d.%m.%Y %H:%M') if d.synced_at else '-' }}</td>
                     <td><a href="/sbis/document/{{ d.id }}" class="btn btn-sm btn-blue">Открыть</a></td>
