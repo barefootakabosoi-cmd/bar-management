@@ -56,8 +56,8 @@ class SbisAPI:
             print(f"Auth exception: {e}")
             return False
 
-    def get_documents(self, doc_type="ДокОтгрВх", days_back=7):
-        """Список документов СБИС"""
+    def get_documents(self, doc_type="ДокОтгрВх", days_back=7, page_size=50):
+        """Список документов СБИС с пагинацией"""
         if not self.token:
             if not self._get_oauth_token():
                 return []
@@ -66,38 +66,54 @@ class SbisAPI:
         date_to = datetime.now().strftime("%d.%m.%Y")
 
         url = f"{self.api_url}/service/?srv=1"
-        payload = {
-            "jsonrpc": "2.0",
-            "method": "СБИС.СписокДокументов",
-            "params": {
-                "Фильтр": {
-                    "Тип": doc_type,
-                    "ДатаС": date_from,
-                    "ДатаПо": date_to
-                }
-            },
-            "id": 1
-        }
+        all_docs = []
+        page = 1
 
-        try:
-            resp = requests.post(url, json=payload, headers=self.headers, timeout=60)
-            print(f"List docs response: {resp.status_code}")
-            if resp.status_code == 200:
-                data = resp.json()
-                if "result" in data:
-                    result = data["result"]
-                    docs = result.get("Документ", []) if isinstance(result, dict) else []
-                    print(f"Found {len(docs)} documents")
-                    return docs
-                elif "error" in data:
-                    print(f"API error: {data['error']}")
-                    return []
-            else:
-                print(f"Request failed: {resp.status_code}")
-                return []
-        except Exception as e:
-            print(f"Request exception: {e}")
-            return []
+        while True:
+            payload = {
+                "jsonrpc": "2.0",
+                "method": "СБИС.СписокДокументов",
+                "params": {
+                    "Фильтр": {
+                        "Тип": doc_type,
+                        "ДатаС": date_from,
+                        "ДатаПо": date_to,
+                        "Навигация": {
+                            "РазмерСтраницы": str(page_size),
+                            "Страница": str(page)
+                        }
+                    }
+                },
+                "id": page
+            }
+
+            try:
+                resp = requests.post(url, json=payload, headers=self.headers, timeout=60)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if "result" in data:
+                        result = data["result"]
+                        docs = result.get("Документ", []) if isinstance(result, dict) else []
+                        all_docs.extend(docs)
+                        print(f"Page {page}: {len(docs)} docs (total: {len(all_docs)})")
+                        
+                        nav = result.get("Навигация", {}) if isinstance(result, dict) else {}
+                        has_more = nav.get("ЕстьЕще", "Нет") == "Да" or len(docs) == page_size
+                        if not has_more or len(docs) == 0:
+                            break
+                        page += 1
+                    elif "error" in data:
+                        print(f"API error: {data['error']}")
+                        break
+                else:
+                    print(f"Request failed: {resp.status_code}")
+                    break
+            except Exception as e:
+                print(f"Request exception: {e}")
+                break
+
+        print(f"Total found: {len(all_docs)} documents")
+        return all_docs
 
     def sync_documents(self, date_from, date_to, existing_doc_ids=None):
         """Sync documents from SBIS (compatible with app.py)"""
@@ -126,8 +142,8 @@ class SbisAPI:
         
         return result
 
-    def get_document_details(self, doc_id):
-        """Получить детали документа"""
+    def get_document_details(self, doc_id, retry=True):
+        """Получить детали документа с авто-обновлением токена"""
         if not self.token:
             if not self._get_oauth_token():
                 return None
@@ -150,6 +166,16 @@ class SbisAPI:
                 data = resp.json()
                 if "result" in data:
                     return data["result"]
+                elif "error" in data and retry:
+                    # Возможно токен протух — пробуем обновить
+                    print(f"Token expired? Retrying {doc_id}...")
+                    if self._get_oauth_token():
+                        return self.get_document_details(doc_id, retry=False)
+            elif resp.status_code == 401 and retry:
+                # Точно протух — обновляем и пробуем ещё раз
+                print(f"401 error, refreshing token for {doc_id}...")
+                if self._get_oauth_token():
+                    return self.get_document_details(doc_id, retry=False)
             return None
         except Exception as e:
             print(f"Details error: {e}")
