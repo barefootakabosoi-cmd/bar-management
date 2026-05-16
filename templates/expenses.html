@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Расходы — Bar Management{% endblock %}
+{% block page_title %}💸 Скрытые расходы{% endblock %}
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <button class="btn btn-green" onclick="document.getElementById('addExpenseForm').style.display='block'">+ Добавить расход</button>
+</div>
+
+<div id="addExpenseForm" class="panel" style="display: none; margin-bottom: 24px;">
+    <div class="panel-header"><h3>Новый расход</h3></div>
+    <div class="panel-body">
+        <form action="/expense/add" method="POST">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Категория</label>
+                    <select name="category_id" class="form-select">
+                        {% for c in categories %}
+                        <option value="{{ c.id }}">{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Название</label>
+                    <input type="text" name="name" class="form-input" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Сумма (₽)</label>
+                    <input type="number" name="amount" step="0.01" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label>Период</label>
+                    <select name="period" class="form-select">
+                        <option value="daily">Ежедневно</option>
+                        <option value="weekly">Еженедельно</option>
+                        <option value="monthly" selected>Ежемесячно</option>
+                        <option value="yearly">Ежегодно</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Примечание</label>
+                <textarea name="note" class="form-textarea" rows="2"></textarea>
+            </div>
+            <button type="submit" class="btn-primary">Добавить</button>
+        </form>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-body">
+        <table class="data-table">
+            <thead>
+                <tr><th>Дата</th><th>Категория</th><th>Название</th><th>Сумма</th><th>Период</th><th>Примечание</th></tr>
+            </thead>
+            <tbody>
+                {% for e in expenses %}
+                <tr>
+                    <td>{{ e.date.strftime('%d.%m.%Y') if e.date else '-' }}</td>
+                    <td>{{ e.category.name if e.category else '-' }}</td>
+                    <td><strong>{{ e.name }}</strong></td>
+                    <td>{{ "%.0f".format(e.amount) }} ₽</td>
+                    <td>{{ e.period }}</td>
+                    <td style="color: var(--text-muted); font-size: 13px;">{{ e.note or '-' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="empty-state">Нет расходов</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

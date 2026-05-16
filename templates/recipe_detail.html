@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}{{ recipe.name }} — Рецепт{% endblock %}
+{% block page_title %}🍔 {{ recipe.name }}{% endblock %}
+{% block content %}
+<div class="bottom-grid" style="grid-template-columns: 2fr 1fr;">
+    <div class="panel">
+        <div class="panel-header">
+            <h3>Ингредиенты</h3>
+            <a href="/recipe/{{ recipe.id }}/pdf" class="btn-sm" target="_blank">📄 PDF</a>
+        </div>
+        <div class="panel-body">
+            {% if recipe.items %}
+            <table class="data-table">
+                <thead>
+                    <tr><th>Ингредиент</th><th>Кол-во</th><th>Цена за ед.</th><th>Стоимость</th><th></th></tr>
+                </thead>
+                <tbody>
+                    {% for item in recipe.items %}
+                    <tr>
+                        <td>{{ item.ingredient_name }}</td>
+                        <td>{{ item.quantity }} {{ item.unit }}</td>
+                        <td>{{ "%.2f".format(item.unit_cost) }} ₽</td>
+                        <td>{{ "%.2f".format(item.total_cost) }} ₽</td>
+                        <td></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">Нет ингредиентов</div>
+            {% endif %}
+
+            <h4 style="margin-top: 24px; margin-bottom: 12px; font-size: 14px; color: var(--text-secondary);">Добавить ингредиент</h4>
+            <form action="/recipe/{{ recipe.id }}/add_item" method="POST">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Из каталога</label>
+                        <select name="ingredient_id" class="form-select">
+                            <option value="">— или вручную —</option>
+                            {% for p in prices %}
+                            <option value="{{ p.id }}">{{ p.name }} ({{ p.base_price }} ₽/{{ p.unit or 'шт' }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Или название</label>
+                        <input type="text" name="ingredient_name" class="form-input" placeholder="Название ингредиента">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Количество</label>
+                        <input type="number" name="quantity" step="0.1" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Единица</label>
+                        <select name="unit" class="form-select">
+                            <option value="г">грамм</option>
+                            <option value="кг">килограмм</option>
+                            <option value="шт">штук</option>
+                            <option value="л">литр</option>
+                            <option value="мл">миллилитр</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-green">+ Добавить</button>
+            </form>
+        </div>
+    </div>
+
+    <div>
+        <div class="panel" style="margin-bottom: 20px;">
+            <div class="panel-header"><h3>💰 Экономика</h3></div>
+            <div class="panel-body">
+                <div style="display: flex; flex-direction: column; gap: 16px;">
+                    <div>
+                        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Себестоимость</div>
+                        <div style="font-size: 24px; font-weight: 700;">{{ "%.0f".format(recipe.total_cost) }} ₽</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Цена продажи</div>
+                        <div style="font-size: 24px; font-weight: 700;">{{ "%.0f".format(recipe.sale_price) }} ₽</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Маржа</div>
+                        <div style="font-size: 24px; font-weight: 700; color: {% if recipe.margin_percent > 50 %}var(--accent-green){% elif recipe.margin_percent > 30 %}var(--accent-orange){% else %}var(--accent-red){% endif %};">
+                            {{ "%.0f".format(recipe.margin_percent) }}%
+                        </div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Прибыль на порцию</div>
+                        <div style="font-size: 20px; font-weight: 700; color: var(--accent-green);">
+                            {{ "%.0f".format(recipe.sale_price - recipe.total_cost) }} ₽
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header"><h3>📜 Версии</h3></div>
+            <div class="panel-body">
+                {% set versions = recipe.versions %}
+                {% if versions %}
+                {% for v in versions %}
+                <div style="padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px;">
+                    <div style="font-weight: 600;">v{{ v.version_number }}</div>
+                    <div style="color: var(--text-muted);">{{ v.change_note or 'Без описания' }}</div>
+                    <div style="color: var(--text-muted); font-size: 11px;">{{ v.created_at.strftime('%d.%m.%Y %H:%M') if v.created_at else '' }}</div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="empty-state">Нет сохранённых версий</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

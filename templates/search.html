@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Поиск — Bar Management{% endblock %}
+{% block page_title %}🔍 Поиск{% endblock %}
+{% block content %}
+<div class="panel" style="max-width: 600px; margin-bottom: 24px;">
+    <div class="panel-body">
+        <form action="/search" method="GET">
+            <div style="display: flex; gap: 12px;">
+                <input type="text" name="q" value="{{ query }}" class="form-input" placeholder="Поиск товаров, рецептов..." style="flex: 1;">
+                <button type="submit" class="btn btn-blue">🔍 Найти</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if results %}
+{% if results.prices %}
+<div class="panel" style="margin-bottom: 20px;">
+    <div class="panel-header"><h3>💰 Товары ({{ results.prices|length }})</h3></div>
+    <div class="panel-body">
+        <table class="data-table">
+            <thead><tr><th>Товар</th><th>Цена</th><th>Статус</th></tr></thead>
+            <tbody>
+                {% for p in results.prices %}
+                <tr>
+                    <td><strong>{{ p.name }}</strong><div style="font-size: 12px; color: var(--text-muted);">{{ p.brand or '' }}</div></td>
+                    <td>{{ "%.0f".format(p.base_price) }} ₽</td>
+                    <td><span class="badge badge-{{ p.status }}">{{ p.status }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if results.recipes %}
+<div class="panel">
+    <div class="panel-header"><h3>🍔 Рецепты ({{ results.recipes|length }})</h3></div>
+    <div class="panel-body">
+        <table class="data-table">
+            <thead><tr><th>Название</th><th>Себестоимость</th><th>Маржа</th></tr></thead>
+            <tbody>
+                {% for r in results.recipes %}
+                <tr>
+                    <td><a href="/recipe/{{ r.id }}" style="color: var(--text-primary); text-decoration: none; font-weight: 600;">{{ r.name }}</a></td>
+                    <td>{{ "%.0f".format(r.total_cost) }} ₽</td>
+                    <td><span class="badge {% if r.margin_percent > 50 %}badge-active{% elif r.margin_percent > 30 %}badge-paused{% else %}badge-discontinued{% endif %}">{{ "%.0f".format(r.margin_percent) }}%</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

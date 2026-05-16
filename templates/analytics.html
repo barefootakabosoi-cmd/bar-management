@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Аналитика — Bar Management{% endblock %}
+{% block page_title %}📈 Аналитика{% endblock %}
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Purchase dynamics chart
+    const ctx = document.getElementById('purchaseChart');
+    if (ctx) {
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: {{ purchase_data|map(attribute='month')|list|tojson }},
+                datasets: [{
+                    label: 'Закупки (₽)',
+                    data: {{ purchase_data|map(attribute='amount')|list|tojson }},
+                    backgroundColor: 'rgba(240, 180, 41, 0.7)',
+                    borderColor: 'rgba(240, 180, 41, 1)',
+                    borderWidth: 1,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(255,255,255,0.05)' },
+                        ticks: { color: '#8b8ba7' }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#8b8ba7' }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
+{% block content %}
+<div class="stats-grid" style="margin-bottom: 24px;">
+    <div class="stat-card stat-promo">
+        <div class="stat-icon">⚡</div>
+        <div class="stat-info">
+            <div class="stat-label">Сэкономлено на акциях</div>
+            <div class="stat-value">{{ "{:,.0f}".format(promo_savings).replace(',', ' ') }} ₽</div>
+        </div>
+    </div>
+</div>
+
+<div class="bottom-grid" style="grid-template-columns: 1fr 1fr;">
+    <div class="panel">
+        <div class="panel-header"><h3>📊 Динамика закупок</h3></div>
+        <div class="panel-body">
+            <div class="chart-container">
+                <canvas id="purchaseChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header"><h3>🏆 Топ товаров по закупкам</h3></div>
+        <div class="panel-body">
+            <table class="data-table">
+                <thead>
+                    <tr><th>Товар</th><th>Кол-во</th><th>Сумма</th></tr>
+                </thead>
+                <tbody>
+                    {% for p in top_products %}
+                    <tr>
+                        <td>{{ p[0] }}</td>
+                        <td>{{ "%.0f".format(p[1] or 0) }}</td>
+                        <td>{{ "%.0f".format(p[2] or 0) }} ₽</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3" class="empty-state">Нет данных</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="panel" style="margin-top: 20px;">
+    <div class="panel-header"><h3>🍔 Маржа по блюдам</h3></div>
+    <div class="panel-body">
+        <table class="data-table">
+            <thead>
+                <tr><th>Блюдо</th><th>Себестоимость</th><th>Цена</th><th>Маржа</th><th>Прибыль</th></tr>
+            </thead>
+            <tbody>
+                {% for r in recipe_margins %}
+                <tr>
+                    <td><strong>{{ r.name }}</strong></td>
+                    <td>{{ "%.0f".format(r.total_cost) }} ₽</td>
+                    <td>{{ "%.0f".format(r.sale_price) }} ₽</td>
+                    <td>
+                        <span class="badge {% if r.margin_percent > 50 %}badge-active{% elif r.margin_percent > 30 %}badge-paused{% else %}badge-discontinued{% endif %}">
+                            {{ "%.0f".format(r.margin_percent) }}%
+                        </span>
+                    </td>
+                    <td style="color: var(--accent-green); font-weight: 600;">{{ "%.0f".format(r.sale_price - r.total_cost) }} ₽</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="empty-state">Нет рецептов</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Документы СБИС — Bar Management{% endblock %}
+{% block page_title %}📄 Документы СБИС{% endblock %}
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <form action="/sbis/sync" method="POST">
+        <input type="hidden" name="sync_type" value="incremental">
+        <button type="submit" class="btn btn-blue">🔄 Синхронизировать</button>
+    </form>
+    <form action="/sbis/sync" method="POST">
+        <input type="hidden" name="sync_type" value="full">
+        <button type="submit" class="btn btn-green">🔄 Полная синхронизация (1 год)</button>
+    </form>
+</div>
+
+<div class="panel">
+    <div class="panel-body">
+        <table class="data-table">
+            <thead>
+                <tr><th>№</th><th>Дата</th><th>Поставщик</th><th>Сумма</th><th>Товаров</th><th>Синхронизирован</th><th>Действия</th></tr>
+            </thead>
+            <tbody>
+                {% if documents %}
+                {% for d in documents %}
+                <tr>
+                    <td>{{ d.doc_number }}</td>
+                    <td>{{ d.doc_date.strftime('%d.%m.%Y') if d.doc_date else '-' }}</td>
+                    <td>{{ d.supplier.name if d.supplier else '-' }}</td>
+                    <td>{{ "%.0f".format(d.total_amount) }} ₽</td>
+                    <td>{{ d.total_items }}</td>
+                    <td>{{ d.synced_at.strftime('%d.%m.%Y %H:%M') if d.synced_at else '-' }}</td>
+                    <td><a href="/sbis/document/{{ d.id }}" class="btn btn-sm btn-blue">Открыть</a></td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr><td colspan="7" class="empty-state">Нет синхронизированных документов. Нажмите "Синхронизировать".</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

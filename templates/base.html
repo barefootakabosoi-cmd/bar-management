@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Bar Management{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="app">
+        <aside class="sidebar">
+            <div class="logo">
+                <span class="logo-icon">🍺</span>
+                <span class="logo-text">Bar<span class="logo-accent">Ctrl</span></span>
+            </div>
+            <nav class="nav">
+                <a href="/" class="nav-item {% if request.path == '/' %}active{% endif %}">
+                    <span class="nav-icon">📊</span><span>Дашборд</span>
+                </a>
+                <a href="/kegs" class="nav-item {% if request.path == '/kegs' %}active{% endif %}">
+                    <span class="nav-icon">🍺</span><span>Кеги</span>
+                </a>
+                <a href="/recipes" class="nav-item {% if request.path.startswith('/recipe') %}active{% endif %}">
+                    <span class="nav-icon">🍔</span><span>Рецепты</span>
+                </a>
+                <a href="/prices" class="nav-item {% if request.path == '/prices' %}active{% endif %}">
+                    <span class="nav-icon">💰</span><span>Прайсы</span>
+                </a>
+                <a href="/suppliers" class="nav-item {% if request.path == '/suppliers' %}active{% endif %}">
+                    <span class="nav-icon">📦</span><span>Поставщики</span>
+                </a>
+                <a href="/bartenders" class="nav-item {% if request.path == '/bartenders' %}active{% endif %}">
+                    <span class="nav-icon">👤</span><span>Бармены</span>
+                </a>
+                <a href="/shifts" class="nav-item {% if request.path == '/shifts' %}active{% endif %}">
+                    <span class="nav-icon">📅</span><span>Смены</span>
+                </a>
+                <a href="/analytics" class="nav-item {% if request.path == '/analytics' %}active{% endif %}">
+                    <span class="nav-icon">📈</span><span>Аналитика</span>
+                </a>
+                <a href="/expenses" class="nav-item {% if request.path == '/expenses' %}active{% endif %}">
+                    <span class="nav-icon">💸</span><span>Расходы</span>
+                </a>
+                <a href="/alerts" class="nav-item {% if request.path == '/alerts' %}active{% endif %}">
+                    <span class="nav-icon">🔔</span><span>Алерты</span>
+                    {% set alert_count = alert_count|default(0) %}
+                    {% if alert_count > 0 %}<span class="nav-badge">{{ alert_count }}</span>{% endif %}
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <form action="/sbis/sync" method="POST" class="sync-form">
+                    <input type="hidden" name="sync_type" value="incremental">
+                    <button type="submit" class="btn-sync">
+                        <span>🔄</span><span>Синхронизировать СБИС</span>
+                    </button>
+                </form>
+            </div>
+        </aside>
+
+        <main class="main">
+            <header class="topbar">
+                <h1 class="page-title">{% block page_title %}Bar Management{% endblock %}</h1>
+                <div class="topbar-actions">
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" placeholder="Поиск..." id="globalSearch">
+                    </div>
+                </div>
+            </header>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="flash-messages">
+                {% for category, message in messages %}
+                <div class="flash flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

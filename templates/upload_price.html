@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Загрузка прайса — Bar Management{% endblock %}
+{% block page_title %}📤 Загрузка прайса{% endblock %}
+{% block content %}
+<div class="panel" style="max-width: 600px; margin-bottom: 24px;">
+    <div class="panel-header"><h3>Загрузить Excel/CSV прайс</h3></div>
+    <div class="panel-body">
+        <form action="/upload" method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+                <label>Поставщик</label>
+                <select name="supplier_id" class="form-select" required>
+                    {% for s in suppliers %}
+                    <option value="{{ s.id }}">{{ s.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Файл прайса (.xlsx, .xls, .csv)</label>
+                <input type="file" name="file" accept=".xlsx,.xls,.csv" class="form-input" required>
+            </div>
+            <button type="submit" class="btn-primary">Загрузить и обработать</button>
+        </form>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-header"><h3>📜 История загрузок</h3></div>
+    <div class="panel-body">
+        <table class="data-table">
+            <thead>
+                <tr><th>Дата</th><th>Поставщик</th><th>Файл</th><th>Товаров</th><th>Статус</th></tr>
+            </thead>
+            <tbody>
+                {% for o in offers %}
+                <tr>
+                    <td>{{ o.uploaded_at.strftime('%d.%m.%Y %H:%M') if o.uploaded_at else '-' }}</td>
+                    <td>{{ o.supplier.name if o.supplier else '-' }}</td>
+                    <td>{{ o.file_name }}</td>
+                    <td>{{ o.items_count }}</td>
+                    <td>
+                        {% if o.processed %}
+                        <span class="badge badge-active">Обработан</span>
+                        {% else %}
+                        <span class="badge badge-paused">В обработке</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="empty-state">Нет загрузок</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

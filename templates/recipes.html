@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Рецепты — Bar Management{% endblock %}
+{% block page_title %}🍔 Рецепты{% endblock %}
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <div style="color: var(--text-secondary); font-size: 14px;">Всего рецептов: {{ recipes|length }}</div>
+    <a href="/recipe/add" class="btn btn-green">+ Новый рецепт</a>
+</div>
+
+<div class="panel">
+    <div class="panel-body">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Название</th>
+                    <th>Категория</th>
+                    <th>Себестоимость</th>
+                    <th>Цена продажи</th>
+                    <th>Маржа</th>
+                    <th>Статус</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for recipe in recipes %}
+                <tr>
+                    <td><strong>{{ recipe.name }}</strong></td>
+                    <td>{{ recipe.category or '-' }}</td>
+                    <td>{{ "%.0f".format(recipe.total_cost) }} ₽</td>
+                    <td>{{ "%.0f".format(recipe.sale_price) }} ₽</td>
+                    <td>
+                        <span class="badge {% if recipe.margin_percent > 50 %}badge-active{% elif recipe.margin_percent > 30 %}badge-paused{% else %}badge-discontinued{% endif %}">
+                            {{ "%.0f".format(recipe.margin_percent) }}%
+                        </span>
+                    </td>
+                    <td><span class="badge badge-{{ recipe.status }}">{{ recipe.status }}</span></td>
+                    <td><a href="/recipe/{{ recipe.id }}" class="btn-sm">Открыть →</a></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="empty-state">Нет рецептов. <a href="/recipe/add">Создать первый</a></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Поставщики — Bar Management{% endblock %}
+{% block page_title %}📦 Поставщики{% endblock %}
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <div style="color: var(--text-secondary); font-size: 14px;">Всего: {{ suppliers|length }}</div>
+    <button class="btn btn-green" onclick="document.getElementById('addSupplierForm').style.display='block'">+ Добавить</button>
+</div>
+
+<div id="addSupplierForm" class="panel" style="display: none; margin-bottom: 24px;">
+    <div class="panel-header"><h3>Новый поставщик</h3></div>
+    <div class="panel-body">
+        <form action="/supplier/add" method="POST">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Название</label>
+                    <input type="text" name="name" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label>Контактное лицо</label>
+                    <input type="text" name="contact" class="form-input">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" name="email" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Телефон</label>
+                    <input type="text" name="phone" class="form-input">
+                </div>
+            </div>
+            <button type="submit" class="btn-primary">Добавить</button>
+        </form>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-body">
+        <table class="data-table">
+            <thead>
+                <tr><th>Название</th><th>Контакт</th><th>Email</th><th>Телефон</th><th>Статус</th><th>Товаров</th><th></th></tr>
+            </thead>
+            <tbody>
+                {% for s in suppliers %}
+                <tr>
+                    <td><strong>{{ s.name }}</strong></td>
+                    <td>{{ s.contact or '-' }}</td>
+                    <td>{{ s.email or '-' }}</td>
+                    <td>{{ s.phone or '-' }}</td>
+                    <td><span class="badge badge-{{ s.status }}">{{ s.status }}</span></td>
+                    <td>{{ s.prices|length }}</td>
+                    <td></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="empty-state">Нет поставщиков</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

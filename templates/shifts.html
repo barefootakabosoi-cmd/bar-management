@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Смены — Bar Management{% endblock %}
+{% block page_title %}📅 Расписание смен{% endblock %}
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <button class="btn btn-green" onclick="document.getElementById('addShiftForm').style.display='block'">+ Добавить смену</button>
+</div>
+
+<div id="addShiftForm" class="panel" style="display: none; margin-bottom: 24px;">
+    <div class="panel-header"><h3>Новая смена</h3></div>
+    <div class="panel-body">
+        <form action="/shift/add" method="POST">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Бармен</label>
+                    <select name="bartender_id" class="form-select" required>
+                        {% for b in bartenders %}
+                        <option value="{{ b.id }}">{{ b.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Тип смены</label>
+                    <select name="shift_type" class="form-select">
+                        <option value="morning">Утро (10:00-18:00)</option>
+                        <option value="evening">Вечер (18:00-02:00)</option>
+                        <option value="night">Ночь (02:00-10:00)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Дата</label>
+                    <input type="date" name="date" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label>Время начала</label>
+                    <input type="time" name="start_time" class="form-input" required>
+                </div>
+            </div>
+            <button type="submit" class="btn-primary">Добавить</button>
+        </form>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-body">
+        <table class="data-table">
+            <thead>
+                <tr><th>Дата</th><th>Бармен</th><th>Время</th><th>Тип</th><th>Выручка</th><th>Статус</th></tr>
+            </thead>
+            <tbody>
+                {% for s in shifts %}
+                <tr>
+                    <td>{{ s.date.strftime('%d.%m.%Y') if s.date else '-' }}</td>
+                    <td><strong>{{ s.bartender.name if s.bartender else '-' }}</strong></td>
+                    <td>{{ s.start_time.strftime('%H:%M') if s.start_time else '-' }} — {{ s.end_time.strftime('%H:%M') if s.end_time else '...' }}</td>
+                    <td>{{ s.shift_type }}</td>
+                    <td>{{ "%.0f".format(s.revenue) }} ₽</td>
+                    <td><span class="badge badge-{{ s.status }}">{{ s.status }}</span></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="empty-state">Нет запланированных смен</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

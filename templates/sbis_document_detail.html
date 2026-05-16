@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Документ {{ document.doc_number }} — Bar Management{% endblock %}
+{% block page_title %}📄 Документ №{{ document.doc_number }}{% endblock %}
+{% block content %}
+<div style="margin-bottom: 24px;">
+    <a href="/sbis" class="btn btn-gray">← Назад к списку</a>
+</div>
+
+<div class="panel">
+    <div class="panel-header">📋 Информация о документе</div>
+    <div class="panel-body">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div><strong>Номер:</strong> {{ document.doc_number }}</div>
+            <div><strong>Дата:</strong> {{ document.doc_date.strftime('%d.%m.%Y') if document.doc_date else '-' }}</div>
+            <div><strong>Поставщик:</strong> {{ supplier.name if supplier else '-' }}</div>
+            <div><strong>Сумма:</strong> {{ "%.2f"|format(document.total_amount) }} ₽</div>
+            <div><strong>Товаров:</strong> {{ document.total_items }}</div>
+            <div><strong>Синхронизирован:</strong> {{ document.synced_at.strftime('%d.%m.%Y %H:%M') if document.synced_at else '-' }}</div>
+        </div>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-header">📦 Позиции документа</div>
+    <div class="panel-body">
+        {% if items %}
+        <table class="data-table">
+            <thead>
+                <tr><th>№</th><th>Наименование</th><th>Кол-во</th><th>Ед.</th><th>Цена</th><th>Сумма</th></tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ item.product_name }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td>{{ item.unit }}</td>
+                    <td>{{ "%.2f"|format(item.price) }} ₽</td>
+                    <td>{{ "%.2f"|format(item.total) }} ₽</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr style="font-weight: bold;">
+                    <td colspan="5">Итого:</td>
+                    <td>{{ "%.2f"|format(items|sum(attribute='total')) }} ₽</td>
+                </tr>
+            </tfoot>
+        </table>
+        {% else %}
+        <div class="empty-state">Позиции не загружены. <a href="/sbis/sync" class="btn btn-blue btn-sm">Синхронизировать</a></div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

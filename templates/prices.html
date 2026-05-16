@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Прайсы — Bar Management{% endblock %}
+{% block page_title %}💰 Каталог товаров{% endblock %}
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <div style="color: var(--text-secondary); font-size: 14px;">Всего товаров: {{ prices|length }}</div>
+    <div style="display: flex; gap: 12px;">
+        <a href="/upload" class="btn btn-blue">📤 Загрузить прайс</a>
+        <button class="btn btn-green" onclick="document.getElementById('addPriceForm').style.display='block'">+ Добавить</button>
+    </div>
+</div>
+
+<div id="addPriceForm" class="panel" style="display: none; margin-bottom: 24px;">
+    <div class="panel-header"><h3>Добавить товар в каталог</h3></div>
+    <div class="panel-body">
+        <form action="/price/add" method="POST">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Поставщик</label>
+                    <select name="supplier_id" class="form-select" required>
+                        {% for s in suppliers %}
+                        <option value="{{ s.id }}">{{ s.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Название</label>
+                    <input type="text" name="name" class="form-input" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Категория</label>
+                    <select name="category" class="form-select">
+                        <option value="keg">Кег</option>
+                        <option value="bottle">Бутылка</option>
+                        <option value="can">Банка</option>
+                        <option value="food">Еда</option>
+                        <option value="other">Другое</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Объём</label>
+                    <input type="text" name="volume" class="form-input" placeholder="30л, 0.5л...">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Бренд</label>
+                    <input type="text" name="brand" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Базовая цена (₽)</label>
+                    <input type="number" name="base_price" step="0.01" class="form-input" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Статус</label>
+                <select name="status" class="form-select">
+                    <option value="active">Active</option>
+                    <option value="trial">Trial</option>
+                    <option value="seasonal">Seasonal</option>
+                    <option value="paused">Paused</option>
+                    <option value="discontinued">Discontinued</option>
+                </select>
+            </div>
+            <button type="submit" class="btn-primary">Добавить</button>
+        </form>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-body">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Товар</th>
+                    <th>Поставщик</th>
+                    <th>Базовая цена</th>
+                    <th>Последняя</th>
+                    <th>Акция</th>
+                    <th>Статус</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in prices %}
+                <tr>
+                    <td>
+                        <strong>{{ p.name }}</strong>
+                        <div style="font-size: 12px; color: var(--text-muted);">{{ p.brand or '' }} {{ p.volume or '' }}</div>
+                    </td>
+                    <td>{{ p.supplier.name if p.supplier else '-' }}</td>
+                    <td>{{ "%.0f".format(p.base_price) }} ₽</td>
+                    <td>
+                        {% if p.is_last_promo %}
+                        <span style="color: var(--accent-green); font-weight: 600;">{{ "%.0f".format(p.last_purchase_price) }} ₽ ⚡</span>
+                        {% else %}
+                        {{ "%.0f".format(p.last_purchase_price) }} ₽
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if p.is_last_promo %}
+                        <span class="badge badge-active">-{{ "%.0f".format(p.promo_discount_percent) }}%</span>
+                        <div style="font-size: 11px; color: var(--accent-green); margin-top: 2px;">Сэкономлено: {{ "%.0f".format(p.total_savings) }} ₽</div>
+                        {% else %}
+                        <span style="color: var(--text-muted); font-size: 12px;">—</span>
+                        {% endif %}
+                    </td>
+                    <td><span class="badge badge-{{ p.status }}">{{ p.status }}</span></td>
+                    <td></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="empty-state">Каталог пуст. <a href="/upload">Загрузите прайс</a> или добавьте товар вручную.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

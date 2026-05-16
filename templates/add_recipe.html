@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Новый рецепт — Bar Management{% endblock %}
+{% block page_title %}🍔 Новый рецепт{% endblock %}
+{% block content %}
+<div class="panel" style="max-width: 600px;">
+    <div class="panel-header"><h3>Создать рецепт</h3></div>
+    <div class="panel-body">
+        <form action="/recipe/add" method="POST">
+            <div class="form-group">
+                <label>Название</label>
+                <input type="text" name="name" class="form-input" required>
+            </div>
+            <div class="form-group">
+                <label>Описание</label>
+                <textarea name="description" class="form-textarea" rows="3"></textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Категория</label>
+                    <select name="category" class="form-select">
+                        <option value="snack">Закуска</option>
+                        <option value="main">Основное</option>
+                        <option value="dessert">Десерт</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Цена продажи (₽)</label>
+                    <input type="number" name="sale_price" step="1" class="form-input" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Размер порции</label>
+                    <input type="number" name="portion_size" value="1" step="0.1" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Единица</label>
+                    <select name="portion_unit" class="form-select">
+                        <option value="г">грамм</option>
+                        <option value="шт">штук</option>
+                        <option value="порция">порция</option>
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="btn-primary">Создать рецепт</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

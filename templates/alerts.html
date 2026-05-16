@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Алерты — Bar Management{% endblock %}
+{% block page_title %}🔔 Алерты{% endblock %}
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        <h3>Все алерты</h3>
+        <div>
+            <a href="#" class="btn-sm" onclick="markAllRead()">Отметить все прочитанными</a>
+        </div>
+    </div>
+    <div class="panel-body">
+        {% for alert in alerts %}
+        <div class="alert-item alert-{{ alert.severity }} {% if alert.is_read %}opacity-50{% endif %}" style="margin-bottom: 12px;">
+            <div class="alert-icon">
+                {% if alert.type == 'price_increase' %}📈{% elif alert.type == 'keg_low' %}🍺{% elif alert.type == 'promo' %}⚡{% else %}🔔{% endif %}
+            </div>
+            <div class="alert-content">
+                <div class="alert-title">{{ alert.title }}</div>
+                <div class="alert-message">{{ alert.message }}</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                    <div class="alert-time">{{ alert.created_at.strftime('%d.%m.%Y %H:%M') if alert.created_at else '' }}</div>
+                    {% if not alert.is_read %}
+                    <button class="btn-sm" onclick="markRead({{ alert.id }})">Отметить прочитанным</button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state">Нет алертов</div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+function markRead(id) {
+    fetch('/alert/' + id + '/read', {method: 'POST'})
+        .then(() => location.reload());
+}
+function markAllRead() {
+    document.querySelectorAll('.alert-item').forEach(a => {
+        // Would need endpoint for bulk update
+    });
+}
+</script>
+{% endblock %}
