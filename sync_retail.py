@@ -182,8 +182,8 @@ class SbisRetailAPI:
             print(f"Balances exception: {e}")
             return []
 
-    def get_nomenclature_list(self, point_id, price_list_id=None, with_balance=True):
-        """GET /retail/nomenclature/list"""
+    def get_nomenclature_list(self, point_id, price_list_id=None, with_balance=True, page=0, page_size=100):
+        """GET /retail/nomenclature/list с пагинацией"""
         if not self.token:
             if not self.authenticate():
                 return []
@@ -193,14 +193,16 @@ class SbisRetailAPI:
 
         params = {
             'pointId': point_id,
-            'withBalance': 'true' if with_balance else 'false'
+            'withBalance': 'true' if with_balance else 'false',
+            'page': page,
+            'pageSize': page_size
         }
         if price_list_id:
             params['priceListId'] = price_list_id
 
         try:
             resp = requests.get(url, headers=headers, params=params, timeout=30)
-            print(f"Nomenclature: {resp.status_code}")
+            print(f"Nomenclature: {resp.status_code}, page={page}")
             if resp.status_code == 200:
                 return resp.json()
             elif resp.status_code == 401:
@@ -216,10 +218,6 @@ class SbisRetailAPI:
         except Exception as e:
             print(f"Nomenclature exception: {e}")
             return []
-
-
-# ==================== СИНХРОНИЗАЦИЯ ====================
-
 class RetailSync:
     def __init__(self):
         self.sbis = SbisRetailAPI(
@@ -406,31 +404,57 @@ class RetailSync:
 
     def sync_balances(self):
         """Синхронизация остатков через номенклатуру (with_balance=True)"""
+    def sync_balances(self):
+        """Синхронизация остатков через номенклатуру (только >0)"""
         logger.info("=" * 60)
         logger.info("СИНХРОНИЗАЦИЯ ОСТАТКОВ (через номенклатуру)")
         logger.info("=" * 60)
 
-        result = self.sbis.get_nomenclature_list(
-            point_id=self.point_id,
-            price_list_id=self.price_list_id,
-            with_balance=True
-        )
+        all_items = []
+        page = 0
 
-        if not result:
-            logger.error("Не удалось получить номенклатуру с остатками")
-            return 0
+        while True:
+            result = self.sbis.get_nomenclature_list(
+                point_id=self.point_id,
+                price_list_id=self.price_list_id,
+                with_balance=True,
+                page=page,
+                page_size=100
+            )
 
-        items = result.get('nomenclatures', result.get('items', []))
-        logger.info("Получено %d товаров", len(items))
+            if not result:
+                break
 
-        # Сохраняем остатки в БД
+            items = result.get('nomenclatures', result.get('items', []))
+            if not items:
+                break
+
+            all_items.extend(items)
+            logger.info("  Страница %d: %d товаров", page, len(items))
+
+            # Проверяем hasMore
+            outcome = result.get('outcome', {}) if isinstance(result, dict) else {}
+            has_more = outcome.get('hasMore', False) if isinstance(outcome, dict) else False
+            logger.info("  hasMore=%s", has_more)
+
+            if not has_more:
+                break
+
+            page += 1
+            time.sleep(0.2)
+
+        logger.info("Всего получено %d товаров", len(all_items))
+
+        # Сохраняем остатки в БД (только > 0)
         StockBalance.query.delete()
 
         count_with_balance = 0
-        for item in items:
+        for item in all_items:
             balance_val = item.get('balance')
             if balance_val is None:
                 continue
+            if float(balance_val) <= 0:
+                continue  # Пропускаем нулевые и отрицательные
 
             count_with_balance += 1
             name = item.get('name', item.get('Номенклатура', ''))
@@ -445,6 +469,8 @@ class RetailSync:
             db.session.add(balance)
 
         db.session.commit()
+        logger.info("Сохранено %d позиций с положительными остатками", count_with_balance)
+        return count_with_balance
         logger.info("Сохранено %d позиций с остатками", count_with_balance)
         return count_with_balance
 
