@@ -352,8 +352,8 @@ class RetailSync:
             sale.date = None
 
         sale.point_id = str(order_data.get('Company', self.point_id))
-        sale.total_sum = float(order_data.get('Sum', 0) or 0)
-        sale.total_sum_with_vat = float(order_data.get('SumWithVat', sale.total_sum) or 0)
+        sale.total_sum = float(order_data.get('TotalPrice', 0) or 0)
+        sale.total_sum_with_vat = float(order_data.get('TotalPrice', sale.total_sum) or 0)
         sale.status = 'deleted' if order_data.get('Deleted') else 'active'
         sale.items_json = order_data
         sale.synced_at = datetime.now()
