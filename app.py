@@ -853,38 +853,16 @@ def stock():
     return render_template('stock.html', balances=balances, totals=totals)
 @app.route('/stock/sync', methods=['POST'])
 def sync_stock():
-    """Синхронизация остатков со СБИС"""
+    """Синхронизация остатков со СБИС через RetailSync"""
     try:
-        sbis = create_sbis_api_from_config(app.config)
+        from sync_retail import RetailSync
+        sync = RetailSync()
+        count = sync.sync_balances()
         
-        balances_data = sbis.get_balances(
-            warehouses=[Config.SBIS_WAREHOUSE_ID] if Config.SBIS_WAREHOUSE_ID else None,
-            companies=[Config.SBIS_COMPANY_ID] if Config.SBIS_COMPANY_ID else None
-        )
-        
-        if not balances_data:
-            flash('Не удалось получить остатки. Проверьте настройки SBIS_*_ID', 'warning')
-            return redirect(url_for('stock'))
-        
-        StockBalance.query.delete()
-        
-        balances_list = balances_data.get('balances', []) if isinstance(balances_data, dict) else balances_data
-        
-        for bal_data in balances_list:
-            name = bal_data.get('name', bal_data.get('Номенклатура', ''))
-            
-            balance = StockBalance(
-                sbis_nomenclature_id=str(bal_data.get('id', '')),
-                sbis_warehouse_id=str(bal_data.get('warehouseId', Config.SBIS_WAREHOUSE_ID or '')),
-                name=name,
-                normalized_name=name.lower(),
-                quantity=float(bal_data.get('quantity', bal_data.get('Количество', 0)) or 0),
-                unit=bal_data.get('unit', bal_data.get('Единица', ''))
-            )
-            db.session.add(balance)
-        
-        db.session.commit()
-        flash(f'Остатки синхронизированы: {len(balances_list)} позиций', 'success')
+        if count > 0:
+            flash(f'Остатки синхронизированы: {count} позиций', 'success')
+        else:
+            flash('Остатки синхронизированы, но нет позиций с остатками', 'warning')
         
     except Exception as e:
         db.session.rollback()

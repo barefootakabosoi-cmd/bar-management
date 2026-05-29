@@ -12,7 +12,7 @@ import json
 import requests
 import time
 from datetime import datetime, timedelta
-
+import time
 # Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
@@ -182,8 +182,8 @@ class SbisRetailAPI:
             print(f"Balances exception: {e}")
             return []
 
-    def get_nomenclature_list(self, point_id, price_list_id=None, with_balance=True):
-        """GET /retail/nomenclature/list"""
+    def get_nomenclature_list(self, point_id, price_list_id=None, with_balance=True, page=0, page_size=100):
+        """GET /retail/nomenclature/list с пагинацией"""
         if not self.token:
             if not self.authenticate():
                 return []
@@ -193,14 +193,16 @@ class SbisRetailAPI:
 
         params = {
             'pointId': point_id,
-            'withBalance': 'true' if with_balance else 'false'
+            'withBalance': 'true' if with_balance else 'false',
+            'page': page,
+            'pageSize': page_size
         }
         if price_list_id:
             params['priceListId'] = price_list_id
 
         try:
             resp = requests.get(url, headers=headers, params=params, timeout=30)
-            print(f"Nomenclature: {resp.status_code}")
+            print(f"Nomenclature: {resp.status_code}, page={page}")
             if resp.status_code == 200:
                 return resp.json()
             elif resp.status_code == 401:
@@ -216,10 +218,6 @@ class SbisRetailAPI:
         except Exception as e:
             print(f"Nomenclature exception: {e}")
             return []
-
-
-# ==================== СИНХРОНИЗАЦИЯ ====================
-
 class RetailSync:
     def __init__(self):
         self.sbis = SbisRetailAPI(
@@ -405,42 +403,76 @@ class RetailSync:
         logger.info("Агрегаты обновлены: %d дней", len(daily))
 
     def sync_balances(self):
+        """Синхронизация остатков через номенклатуру (with_balance=True)"""
+    def sync_balances(self):
+        """Синхронизация остатков через номенклатуру (только >0)"""
         logger.info("=" * 60)
-        logger.info("СИНХРОНИЗАЦИЯ ОСТАТКОВ")
+        logger.info("СИНХРОНИЗАЦИЯ ОСТАТКОВ (через номенклатуру)")
         logger.info("=" * 60)
 
-        if not self.warehouse_id:
-            logger.error("SBIS_WAREHOUSE_ID не настроен!")
-            return 0
+        all_items = []
+        page = 0
 
-        balances_data = self.sbis.get_balances(
-            warehouses=[self.warehouse_id],
-            companies=[self.company_id] if self.company_id else None
-        )
+        while True:
+            result = self.sbis.get_nomenclature_list(
+                point_id=self.point_id,
+                price_list_id=self.price_list_id,
+                with_balance=True,
+                page=page,
+                page_size=100
+            )
 
-        if not balances_data:
-            logger.error("Не удалось получить остатки")
-            return 0
+            if not result:
+                break
 
+            items = result.get('nomenclatures', result.get('items', []))
+            if not items:
+                break
+
+            all_items.extend(items)
+            logger.info("  Страница %d: %d товаров", page, len(items))
+
+            # Проверяем hasMore
+            outcome = result.get('outcome', {}) if isinstance(result, dict) else {}
+            has_more = outcome.get('hasMore', False) if isinstance(outcome, dict) else False
+            logger.info("  hasMore=%s", has_more)
+
+            if not has_more:
+                break
+
+            page += 1
+            time.sleep(0.2)
+
+        logger.info("Всего получено %d товаров", len(all_items))
+
+        # Сохраняем остатки в БД (только > 0)
         StockBalance.query.delete()
 
-        balances_list = balances_data.get('balances', []) if isinstance(balances_data, dict) else balances_data
+        count_with_balance = 0
+        for item in all_items:
+            balance_val = item.get('balance')
+            if balance_val is None:
+                continue
+            if float(balance_val) <= 0:
+                continue  # Пропускаем нулевые и отрицательные
 
-        for bal_data in balances_list:
-            name = bal_data.get('name', bal_data.get('Номенклатура', ''))
+            count_with_balance += 1
+            name = item.get('name', item.get('Номенклатура', ''))
             balance = StockBalance(
-                sbis_nomenclature_id=str(bal_data.get('id', '')),
-                sbis_warehouse_id=str(bal_data.get('warehouseId', self.warehouse_id)),
+                sbis_nomenclature_id=str(item.get('id', '')),
+                sbis_warehouse_id=str(self.warehouse_id or ''),
                 name=name,
                 normalized_name=name.lower() if name else '',
-                quantity=float(bal_data.get('quantity', bal_data.get('Количество', 0)) or 0),
-                unit=bal_data.get('unit', bal_data.get('Единица', ''))
+                quantity=float(balance_val),
+                unit=item.get('unit', item.get('Единица', 'шт')),
             )
             db.session.add(balance)
 
         db.session.commit()
-        logger.info("Загружено %d остатков", len(balances_list))
-        return len(balances_list)
+        logger.info("Сохранено %d позиций с положительными остатками", count_with_balance)
+        return count_with_balance
+        logger.info("Сохранено %d позиций с остатками", count_with_balance)
+        return count_with_balance
 
     def sync_nomenclature(self):
         logger.info("=" * 60)

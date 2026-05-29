@@ -217,6 +217,63 @@ class SbisRetailAPI:
             print(f"Nomenclature exception: {e}")
             return []
 
+    def get_companies(self):
+        """GET /retail/company/list — список организаций"""
+        if not self.token:
+            if not self.authenticate():
+                return []
+
+        url = f"{self.retail_url}/retail/company/list"
+        headers = {"X-SBISAccessToken": self.token}
+
+        try:
+            resp = requests.get(url, headers=headers, timeout=30)
+            print(f"Companies: {resp.status_code}")
+            if resp.status_code == 200:
+                return resp.json()
+            elif resp.status_code == 401:
+                if self.authenticate():
+                    headers = {"X-SBISAccessToken": self.token}
+                    resp = requests.get(url, headers=headers, timeout=30)
+                    if resp.status_code == 200:
+                        return resp.json()
+                return []
+            else:
+                print(f"Companies error: {resp.status_code}, {resp.text[:200]}")
+                return []
+        except Exception as e:
+            print(f"Companies exception: {e}")
+            return []
+
+    def get_warehouses(self, company_id):
+        """GET /retail/company/warehouses — склады организации"""
+        if not self.token:
+            if not self.authenticate():
+                return []
+
+        url = f"{self.retail_url}/retail/company/warehouses"
+        headers = {"X-SBISAccessToken": self.token}
+        params = {'companyId': company_id}
+
+        try:
+            resp = requests.get(url, headers=headers, params=params, timeout=30)
+            print(f"Warehouses: {resp.status_code}")
+            if resp.status_code == 200:
+                return resp.json()
+            elif resp.status_code == 401:
+                if self.authenticate():
+                    headers = {"X-SBISAccessToken": self.token}
+                    resp = requests.get(url, headers=headers, params=params, timeout=30)
+                    if resp.status_code == 200:
+                        return resp.json()
+                return []
+            else:
+                print(f"Warehouses error: {resp.status_code}, {resp.text[:200]}")
+                return []
+        except Exception as e:
+            print(f"Warehouses exception: {e}")
+            return []
+
 
 # ==================== СИНХРОНИЗАЦИЯ ====================
 
@@ -444,42 +501,67 @@ class RetailSync:
 
     def sync_nomenclature(self):
         logger.info("=" * 60)
-        logger.info("СИНХРОНИЗАЦИЯ НОМЕНКЛАТУРЫ")
+        logger.info("СИНХРОНИЗАЦИЯ НОМЕНКЛАТУРЫ И ОСТАТКОВ")
         logger.info("=" * 60)
 
-        all_items = []
-        page = 0
+        result = self.sbis.get_nomenclature_list(
+            point_id=self.point_id,
+            price_list_id=self.price_list_id,
+            with_balance=True
+        )
 
-        while True:
-            result = self.sbis.get_nomenclature_list(
-                point_id=self.point_id,
-                price_list_id=self.price_list_id,
-                with_balance=True
+        if not result:
+            logger.error("Не удалось получить номенклатуру")
+            return 0
+
+        items = result.get('nomenclatures', [])
+        if not items:
+            logger.warning("Номенклатура пуста")
+            return 0
+
+        logger.info("Получено %d товаров", len(items))
+
+        # Очищаем старые остатки
+        StockBalance.query.delete()
+
+        saved = 0
+        for item in items:
+            # Пропускаем родительские категории (группы)
+            if item.get('isParent'):
+                continue
+
+            name = item.get('name', '')
+            balance = item.get('balance')
+            cost = item.get('cost')
+            volume = item.get('attributes', {}).get('volume')
+
+            # Определяем, является ли товар кегом
+            is_keg = False
+            keg_liters = None
+            if volume:
+                keg_liters = float(volume) / 1000  # мл → л
+                is_keg = keg_liters >= 10  # Кеги обычно 10л, 20л, 30л
+
+            sb = StockBalance(
+                sbis_nomenclature_id=str(item.get('id', '')),
+                sbis_warehouse_id=str(self.warehouse_id or ''),
+                name=name,
+                normalized_name=name.lower() if name else '',
+                quantity=float(balance) if balance is not None else 0,
+                unit=item.get('unit', 'шт'),
+                keg_liters=keg_liters
             )
+            db.session.add(sb)
+            saved += 1
 
-            if not result:
-                break
+        db.session.commit()
+        logger.info("Сохранено %d остатков", saved)
 
-            items = result.get('nomenclatures', result.get('items', []))
-            if not items:
-                break
-
-            all_items.extend(items)
-            logger.info("  Страница %d: %d товаров", page, len(items))
-
-            if len(items) < 100:
-                break
-
-            page += 1
-            time.sleep(0.2)
-
-        logger.info("Всего получено %d товаров", len(all_items))
-
+        # Сохраняем в JSON для справки
         with open('nomenclature_cache.json', 'w', encoding='utf-8') as f:
-            json.dump(all_items, f, ensure_ascii=False, indent=2)
+            json.dump(items, f, ensure_ascii=False, indent=2)
 
-        logger.info("Сохранено в nomenclature_cache.json")
-        return len(all_items)
+        return saved
 
     def get_stats(self):
         return {
@@ -508,6 +590,34 @@ def test_points():
     else:
         print(f"  Ответ: {points}")
 
+def test_companies():
+    sync = RetailSync()
+    companies = sync.sbis.get_companies()
+    print("\nОрганизации:")
+    if isinstance(companies, dict) and 'companies' in companies:
+        for c in companies['companies']:
+            print(f"  ID: {c.get('id')}, Название: {c.get('name')}, ИНН: {c.get('inn')}")
+    elif isinstance(companies, list):
+        for c in companies:
+            print(f"  ID: {c.get('id')}, Название: {c.get('name')}")
+    else:
+        print(f"  Ответ: {companies}")
+
+def test_warehouses(company_id=None):
+    sync = RetailSync()
+    if not company_id:
+        company_id = sync.company_id or sync.point_id
+    warehouses = sync.sbis.get_warehouses(company_id)
+    print(f"\nСклады (companyId={company_id}):")
+    if isinstance(warehouses, dict) and 'warehouses' in warehouses:
+        for w in warehouses['warehouses']:
+            print(f"  ID: {w.get('id')}, Название: {w.get('name')}, Адрес: {w.get('address', 'N/A')}")
+    elif isinstance(warehouses, list):
+        for w in warehouses:
+            print(f"  ID: {w.get('id')}, Название: {w.get('name')}")
+    else:
+        print(f"  Ответ: {warehouses}")
+
 
 def main():
     parser = argparse.ArgumentParser(description='Синхронизация СБИС Retail API')
@@ -518,11 +628,21 @@ def main():
     parser.add_argument('--days', type=int, default=365, help='Период в днях')
     parser.add_argument('--stats', action='store_true', help='Показать статистику')
     parser.add_argument('--test-points', action='store_true', help='Показать торговые точки')
+    parser.add_argument('--test-companies', action='store_true', help='Показать организации')
+    parser.add_argument('--test-warehouses', type=int, help='Показать склады (companyId)')
 
     args = parser.parse_args()
 
     if args.test_points:
         test_points()
+        return
+
+    if args.test_companies:
+        test_companies()
+        return
+
+    if args.test_warehouses:
+        test_warehouses(args.test_warehouses)
         return
 
     if args.stats:

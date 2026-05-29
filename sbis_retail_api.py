@@ -88,15 +88,20 @@ class SbisRetailAPI(SbisAPI):
         url = f"{self.retail_url}/retail/nomenclature/balances"
         headers = {"X-SBISAccessToken": self.token}
 
-        params = {}
-        if nomenclatures:
-            params['nomenclatures'] = ','.join(map(str, nomenclatures))
-        if warehouses:
-            params['warehouses'] = ','.join(map(str, warehouses))
+        # Используем список кортежей для массивов (companies[], warehouses[], nomenclatures[])
+        params = []
         if companies:
-            params['companies'] = ','.join(map(str, companies))
+            for c in companies:
+                params.append(('companies[]', c))
+        if warehouses:
+            for w in warehouses:
+                params.append(('warehouses[]', w))
+        if nomenclatures:
+            for n in nomenclatures:
+                params.append(('nomenclatures[]', n))
         if price_list_ids:
-            params['priceListIds'] = ','.join(map(str, price_list_ids))
+            for p in price_list_ids:
+                params.append(('priceListIds[]', p))
 
         try:
             resp = requests.get(url, headers=headers, params=params, timeout=30)
@@ -118,24 +123,25 @@ class SbisRetailAPI(SbisAPI):
             return []
 
     def get_nomenclature_list(self, point_id, price_list_id=None, with_balance=True):
-        """GET /retail/nomenclature/list — номенклатура"""
+        """GET /retail/v2/nomenclature/list — номенклатура с остатками"""
         if not self.token:
             if not self.authenticate():
                 return []
 
-        url = f"{self.retail_url}/retail/nomenclature/list"
+        url = f"{self.retail_url}/retail/v2/nomenclature/list"
         headers = {"X-SBISAccessToken": self.token}
 
         params = {
             'pointId': point_id,
-            'withBalance': 'true' if with_balance else 'false'
+            'withBalance': 'true' if with_balance else 'false',
+            'pageSize': 100
         }
         if price_list_id:
             params['priceListId'] = price_list_id
 
         try:
             resp = requests.get(url, headers=headers, params=params, timeout=30)
-            print(f"Nomenclature: {resp.status_code}")
+            print(f"Nomenclature v2: {resp.status_code}")
             if resp.status_code == 200:
                 return resp.json()
             elif resp.status_code == 401:
@@ -146,10 +152,10 @@ class SbisRetailAPI(SbisAPI):
                         return resp.json()
                 return []
             else:
-                print(f"Nomenclature error: {resp.status_code}, {resp.text[:200]}")
+                print(f"Nomenclature v2 error: {resp.status_code}, {resp.text[:200]}")
                 return []
         except Exception as e:
-            print(f"Nomenclature exception: {e}")
+            print(f"Nomenclature v2 exception: {e}")
             return []
 
     def get_sales_by_period(self, point_id=None, days=7):
@@ -199,3 +205,60 @@ class SbisRetailAPI(SbisAPI):
             time.sleep(0.2)
 
         return all_orders
+
+    def get_companies(self):
+        """GET /retail/company/list — список организаций"""
+        if not self.token:
+            if not self.authenticate():
+                return []
+
+        url = f"{self.retail_url}/retail/company/list"
+        headers = {"X-SBISAccessToken": self.token}
+
+        try:
+            resp = requests.get(url, headers=headers, timeout=30)
+            print(f"Companies: {resp.status_code}")
+            if resp.status_code == 200:
+                return resp.json()
+            elif resp.status_code == 401:
+                if self.authenticate():
+                    headers = {"X-SBISAccessToken": self.token}
+                    resp = requests.get(url, headers=headers, timeout=30)
+                    if resp.status_code == 200:
+                        return resp.json()
+                return []
+            else:
+                print(f"Companies error: {resp.status_code}, {resp.text[:200]}")
+                return []
+        except Exception as e:
+            print(f"Companies exception: {e}")
+            return []
+
+    def get_warehouses(self, company_id):
+        """GET /retail/company/warehouses — склады организации"""
+        if not self.token:
+            if not self.authenticate():
+                return []
+
+        url = f"{self.retail_url}/retail/company/warehouses"
+        headers = {"X-SBISAccessToken": self.token}
+        params = {'companyId': company_id}
+
+        try:
+            resp = requests.get(url, headers=headers, params=params, timeout=30)
+            print(f"Warehouses: {resp.status_code}")
+            if resp.status_code == 200:
+                return resp.json()
+            elif resp.status_code == 401:
+                if self.authenticate():
+                    headers = {"X-SBISAccessToken": self.token}
+                    resp = requests.get(url, headers=headers, params=params, timeout=30)
+                    if resp.status_code == 200:
+                        return resp.json()
+                return []
+            else:
+                print(f"Warehouses error: {resp.status_code}, {resp.text[:200]}")
+                return []
+        except Exception as e:
+            print(f"Warehouses exception: {e}")
+            return []
