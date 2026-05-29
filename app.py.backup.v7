@@ -9,7 +9,7 @@ import pandas as pd
 from io import BytesIO
 
 from config import Config
-from models import db, KegOpening, Writeoff, KegRetailMapping, Keg, ActiveSupplierPrice
+from models import db, KegOpening, Writeoff, KegRetailMapping, Keg
 from models import Recipe, RecipeItem, RecipeVersion, Expense, ExpenseCategory
 from models import Bartender, Shift, SBISDocument, SBISDocumentItem, Alert, SyncLog
 from models import StockBalance, SaleRecord, DailySalesSummary
@@ -1101,30 +1101,6 @@ def v8_map_keg():
     flash(f"Кега '{keg_name}' связана с '{retail_name}'", 'success')
     return redirect(url_for('v8_openings'))
 
-
-# ========== V8: DocOpening / АктСписания / ДокОтгрИсх ==========
-    keg_name = request.form.get('keg_name', '')
-    retail_name = request.form.get('retail_name', '')
-
-    if not keg_name or not retail_name:
-        flash('Укажите название кеги и розлива', 'warning')
-        return redirect(url_for('v8_openings'))
-
-    mapping = KegRetailMapping.query.filter_by(keg_name=keg_name).first()
-    if not mapping:
-        mapping = KegRetailMapping(keg_name=keg_name, retail_name=retail_name)
-        db.session.add(mapping)
-    else:
-        mapping.retail_name = retail_name
-
-    KegOpening.query.filter_by(name=keg_name).update({
-        'is_mapped': True,
-        'mapped_retail_name': retail_name
-    })
-
-    db.session.commit()
-    flash(f"Кега '{keg_name}' связана с '{retail_name}'", 'success')
-    return redirect(url_for('v8_openings'))
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)
