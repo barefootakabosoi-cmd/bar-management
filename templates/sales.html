@@ -14,7 +14,7 @@
             </div>
         </form>
     </div>
-    {% if month_total > 0 %}
+    {% if month_total is defined and month_total > 0 %}
     <div class="alert alert-success mb-4"><h5 class="mb-1">📈 Продажи за месяц</h5><p class="mb-0 display-6">{{ "%.0f"|format(month_total) }} ₽</p></div>
     {% endif %}
     {% if daily %}

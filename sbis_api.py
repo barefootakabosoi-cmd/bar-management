@@ -396,42 +396,76 @@ class SbisAPI:
             return []
 
     def get_sales_by_period(self, point_id=None, days=7):
-        """Продажи за последние N дней со всей пагинацией"""
-        from datetime import datetime, timedelta
-        import time
+        """Получить продажи (исходящие реализации) за период"""
+        if not self.token:
+            if not self._get_oauth_token():
+                return None
         
-        date_to = datetime.now()
-        date_from = date_to - timedelta(days=days)
+        date_from = (datetime.now() - timedelta(days=days)).strftime("%d.%m.%Y")
+        date_to = datetime.now().strftime("%d.%m.%Y")
         
+        url = f"{self.api_url}/service/?srv=1"
         all_orders = []
-        page = 0
+        page = 1
         
-        while True:
-            result = self.get_sales(
-                point_id=point_id,
-                date_from=date_from,
-                date_to=date_to,
-                page=page,
-                page_size=100
-            )
-            
-            if not result:
-                break
-            
-            orders = result.get('orders', []) if isinstance(result, dict) else result
-            if not orders:
-                break
-            
-            all_orders.extend(orders)
-            
-            total = result.get('total', 0) if isinstance(result, dict) else len(orders)
-            if len(orders) < 100 or len(all_orders) >= total:
-                break
-            
-            page += 1
-            time.sleep(0.1)
+        # Используем ДокОтгрИсх (исходящие реализации = продажи)
+        doc_types = ["ДокОтгрИсх", "Реализация", "Чек"]
         
+        for doc_type in doc_types:
+            try:
+                while True:
+                    payload = {
+                        "jsonrpc": "2.0",
+                        "method": "СБИС.СписокДокументов",
+                        "params": {
+                            "Фильтр": {
+                                "Тип": doc_type,
+                                "ДатаС": date_from,
+                                "ДатаПо": date_to,
+                                "Навигация": {
+                                    "РазмерСтраницы": "50",
+                                    "Страница": str(page)
+                                }
+                            }
+                        },
+                        "id": page
+                    }
+                    
+                    resp = requests.post(url, json=payload, headers=self.headers, timeout=60)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        if "result" in data:
+                            result = data["result"]
+                            docs = result.get("Документ", []) if isinstance(result, dict) else []
+                            
+                            for doc in docs:
+                                all_orders.append({
+                                    "id": doc.get("Идентификатор", ""),
+                                    "number": doc.get("Номер", ""),
+                                    "date": doc.get("Дата", ""),
+                                    "dateTime": doc.get("ДатаВремя", doc.get("Дата", "")),
+                                    "sum": self._safe_float(doc.get("Сумма", 0)),
+                                    "sumWithVat": self._safe_float(doc.get("СуммаСНдс", doc.get("Сумма", 0))),
+                                    "status": doc.get("Состояние", doc.get("Статус", "")),
+                                    "pointId": point_id or "",
+                                    "items": doc.get("Товары", [])
+                                })
+                            
+                            nav = result.get("Навигация", {}) if isinstance(result, dict) else {}
+                            if nav.get("ЕстьЕще", "Нет") != "Да":
+                                break
+                            page += 1
+                        else:
+                            break
+                    else:
+                        break
+            except Exception as e:
+                print(f"Sales method {doc_type} error: {e}")
+                continue
+        
+        print(f"Total sales found: {len(all_orders)}")
         return all_orders
+
 
     def sync_all_documents(self, doc_type="ДокОтгрВх", days_back=7):
         """Полная синхронизация документов"""
@@ -469,3 +503,346 @@ def create_sbis_api_from_config(config):
 def get_last_sync_date(db_model):
     """Get date of last successful sync"""
     return datetime.utcnow() - timedelta(days=365)
+
+# ==================== УЛУЧШЕННАЯ СИНХРОНИЗАЦИЯ ЗА ГОД ====================
+
+def get_sales_by_period_monthly(self, point_id=None, days=365):
+    """
+    Продажи за большой период с разбивкой по месяцам.
+    Избегает перегрузки API при запросе за год.
+    """
+    from datetime import datetime, timedelta
+    import time
+
+    date_to = datetime.now()
+    date_from = date_to - timedelta(days=days)
+
+    all_orders = []
+    current_month = date_from
+
+    while current_month < date_to:
+        month_end = min(
+            (current_month.replace(day=1) + timedelta(days=32)).replace(day=1) - timedelta(days=1),
+            date_to
+        )
+
+        print(f"Загрузка: {current_month.strftime('%Y-%m-%d')} → {month_end.strftime('%Y-%m-%d')}")
+
+        page = 0
+        month_orders = 0
+
+        while True:
+            result = self.get_sales(
+                point_id=point_id,
+                date_from=current_month,
+                date_to=month_end,
+                page=page,
+                page_size=100
+            )
+
+            if not result:
+                break
+
+            orders = result.get('orders', []) if isinstance(result, dict) else result
+            if not orders:
+                break
+
+            all_orders.extend(orders)
+            month_orders += len(orders)
+
+            total = result.get('total', 0) if isinstance(result, dict) else len(orders)
+            if len(orders) < 100 or month_orders >= total:
+                break
+
+            page += 1
+            time.sleep(0.2)  # Небольшая задержка между страницами
+
+        print(f"  Месяц загружен: {month_orders} заказов")
+        current_month = month_end + timedelta(days=1)
+
+    print(f"Всего загружено: {len(all_orders)} заказов")
+    return all_orders
+
+
+def get_all_nomenclature(self, point_id, price_list_id=None, with_balance=True):
+    """
+    Вся номенклатура с автопагинацией
+    """
+    page = 0
+    all_items = []
+
+    while True:
+        result = self.get_nomenclature_list(
+            point_id=point_id,
+            price_list_id=price_list_id,
+            with_balance=with_balance
+        )
+
+        if not result:
+            break
+
+        items = result.get('nomenclatures', result.get('items', []))
+        if not items:
+            break
+
+        all_items.extend(items)
+
+        if len(items) < 100:
+            break
+
+        page += 1
+        time.sleep(0.1)
+
+    return all_items
+
+# ==================== УЛУЧШЕННАЯ СИНХРОНИЗАЦИЯ ЗА ГОД ====================
+
+def get_sales_by_period_monthly(self, point_id=None, days=365):
+    """
+    Продажи за большой период с разбивкой по месяцам.
+    Избегает перегрузки API при запросе за год.
+    """
+    from datetime import datetime, timedelta
+    import time
+
+    date_to = datetime.now()
+    date_from = date_to - timedelta(days=days)
+
+    all_orders = []
+    current_month = date_from
+
+    while current_month < date_to:
+        month_end = min(
+            (current_month.replace(day=1) + timedelta(days=32)).replace(day=1) - timedelta(days=1),
+            date_to
+        )
+
+        print(f"Загрузка: {current_month.strftime('%Y-%m-%d')} → {month_end.strftime('%Y-%m-%d')}")
+
+        page = 0
+        month_orders = 0
+
+        while True:
+            result = self.get_sales(
+                point_id=point_id,
+                date_from=current_month,
+                date_to=month_end,
+                page=page,
+                page_size=100
+            )
+
+            if not result:
+                break
+
+            orders = result.get('orders', []) if isinstance(result, dict) else result
+            if not orders:
+                break
+
+            all_orders.extend(orders)
+            month_orders += len(orders)
+
+            total = result.get('total', 0) if isinstance(result, dict) else len(orders)
+            if len(orders) < 100 or month_orders >= total:
+                break
+
+            page += 1
+            time.sleep(0.2)  # Небольшая задержка между страницами
+
+        print(f"  Месяц загружен: {month_orders} заказов")
+        current_month = month_end + timedelta(days=1)
+
+    print(f"Всего загружено: {len(all_orders)} заказов")
+    return all_orders
+
+
+def get_all_nomenclature(self, point_id, price_list_id=None, with_balance=True):
+    """
+    Вся номенклатура с автопагинацией
+    """
+    page = 0
+    all_items = []
+
+    while True:
+        result = self.get_nomenclature_list(
+            point_id=point_id,
+            price_list_id=price_list_id,
+            with_balance=with_balance
+        )
+
+        if not result:
+            break
+
+        items = result.get('nomenclatures', result.get('items', []))
+        if not items:
+            break
+
+        all_items.extend(items)
+
+        if len(items) < 100:
+            break
+
+        page += 1
+        time.sleep(0.1)
+
+    return all_items
+
+# ==================== ФИКС RETAIL API URL ====================
+# Добавьте в __init__ SbisAPI:
+# self.retail_url = "https://api.sbis.ru"
+
+# Замените методы get_sales, get_balances, get_nomenclature_list на эти:
+
+def get_sales(self, point_id=None, date_from=None, date_to=None, page=0, page_size=50):
+    """Получить заказы через /retail/order/list (API.SBIS.RU)"""
+    if not self.token:
+        if not self.authenticate():
+            return []
+
+    # Используем retail_url вместо base_url
+    retail_url = "https://api.sbis.ru"
+    url = f"{retail_url}/retail/order/list"
+    headers = {"X-SBISAccessToken": self.token}
+
+    params = {
+        'page': page,
+        'pageSize': page_size
+    }
+    if point_id:
+        params['pointId'] = point_id
+    if date_from:
+        # Формат: ГГГГ-ММ-ДД чч:мм:сс
+        if isinstance(date_from, datetime):
+            params['fromDateTime'] = date_from.strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            params['fromDateTime'] = date_from
+    if date_to:
+        if isinstance(date_to, datetime):
+            params['toDateTime'] = date_to.strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            params['toDateTime'] = date_to
+
+    try:
+        resp = requests.get(url, headers=headers, params=params, timeout=30)
+        print(f"Sales request: {url}, params={params}, status={resp.status_code}")
+        if resp.status_code == 200:
+            return resp.json()
+        elif resp.status_code == 401:
+            if self.authenticate():
+                headers = {"X-SBISAccessToken": self.token}
+                resp = requests.get(url, headers=headers, params=params, timeout=30)
+                if resp.status_code == 200:
+                    return resp.json()
+            return []
+        else:
+            print(f"Sales error: {resp.status_code}, body: {resp.text[:200]}")
+            return []
+    except Exception as e:
+        print(f"Sales exception: {e}")
+        return []
+
+
+def get_balances(self, nomenclatures=None, warehouses=None, companies=None, price_list_ids=None):
+    """Получить остатки через /retail/nomenclature/balances (API.SBIS.RU)"""
+    if not self.token:
+        if not self.authenticate():
+            return []
+
+    retail_url = "https://api.sbis.ru"
+    url = f"{retail_url}/retail/nomenclature/balances"
+    headers = {"X-SBISAccessToken": self.token}
+
+    params = {}
+    if nomenclatures:
+        params['nomenclatures'] = ','.join(map(str, nomenclatures))
+    if warehouses:
+        params['warehouses'] = ','.join(map(str, warehouses))
+    if companies:
+        params['companies'] = ','.join(map(str, companies))
+    if price_list_ids:
+        params['priceListIds'] = ','.join(map(str, price_list_ids))
+
+    try:
+        resp = requests.get(url, headers=headers, params=params, timeout=30)
+        print(f"Balances request: {url}, status={resp.status_code}")
+        if resp.status_code == 200:
+            return resp.json()
+        elif resp.status_code == 401:
+            if self.authenticate():
+                headers = {"X-SBISAccessToken": self.token}
+                resp = requests.get(url, headers=headers, params=params, timeout=30)
+                if resp.status_code == 200:
+                    return resp.json()
+            return []
+        else:
+            print(f"Balances error: {resp.status_code}, body: {resp.text[:200]}")
+            return []
+    except Exception as e:
+        print(f"Balances exception: {e}")
+        return []
+
+
+def get_nomenclature_list(self, point_id, price_list_id=None, with_balance=True):
+    """Получить номенклатуру через /retail/nomenclature/list (API.SBIS.RU)"""
+    if not self.token:
+        if not self.authenticate():
+            return []
+
+    retail_url = "https://api.sbis.ru"
+    url = f"{retail_url}/retail/nomenclature/list"
+    headers = {"X-SBISAccessToken": self.token}
+
+    params = {
+        'pointId': point_id,
+        'withBalance': 'true' if with_balance else 'false'
+    }
+    if price_list_id:
+        params['priceListId'] = price_list_id
+
+    try:
+        resp = requests.get(url, headers=headers, params=params, timeout=30)
+        print(f"Nomenclature request: {url}, status={resp.status_code}")
+        if resp.status_code == 200:
+            return resp.json()
+        elif resp.status_code == 401:
+            if self.authenticate():
+                headers = {"X-SBISAccessToken": self.token}
+                resp = requests.get(url, headers=headers, params=params, timeout=30)
+                if resp.status_code == 200:
+                    return resp.json()
+            return []
+        else:
+            print(f"Nomenclature error: {resp.status_code}, body: {resp.text[:200]}")
+            return []
+    except Exception as e:
+        print(f"Nomenclature exception: {e}")
+        return []
+
+
+def get_points(self):
+    """Получить список торговых точек /retail/point/list"""
+    if not self.token:
+        if not self.authenticate():
+            return []
+
+    retail_url = "https://api.sbis.ru"
+    url = f"{retail_url}/retail/point/list"
+    headers = {"X-SBISAccessToken": self.token}
+
+    try:
+        resp = requests.get(url, headers=headers, timeout=30)
+        print(f"Points request: {url}, status={resp.status_code}")
+        if resp.status_code == 200:
+            return resp.json()
+        elif resp.status_code == 401:
+            if self.authenticate():
+                headers = {"X-SBISAccessToken": self.token}
+                resp = requests.get(url, headers=headers, timeout=30)
+                if resp.status_code == 200:
+                    return resp.json()
+            return []
+        else:
+            print(f"Points error: {resp.status_code}, body: {resp.text[:200]}")
+            return []
+    except Exception as e:
+        print(f"Points exception: {e}")
+        return []

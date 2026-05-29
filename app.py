@@ -11,6 +11,7 @@ from config import Config
 from models import db, Supplier, SupplierOffer, ActiveSupplierPrice, Keg, KegHistory
 from models import Recipe, RecipeItem, RecipeVersion, Expense, ExpenseCategory
 from models import Bartender, Shift, SBISDocument, SBISDocumentItem, Alert, SyncLog
+from models import StockBalance, SaleRecord, DailySalesSummary
 from sbis_api import create_sbis_api_from_config, get_last_sync_date
 
 app = Flask(__name__)
@@ -837,11 +838,6 @@ def sbis_document_detail(id):
     return render_template('sbis_document_detail.html', document=doc, items=items, supplier=supplier)
 
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5001)
-
-# ==================== ОСТАТКИ (КЕГИ) ====================
-
 @app.route('/stock')
 def stock():
     """Остатки на складе"""
@@ -855,7 +851,6 @@ def stock():
         totals[key]['total'] += bal.quantity or 0
     
     return render_template('stock.html', balances=balances, totals=totals)
-
 @app.route('/stock/sync', methods=['POST'])
 def sync_stock():
     """Синхронизация остатков со СБИС"""
@@ -898,7 +893,6 @@ def sync_stock():
     return redirect(url_for('stock'))
 
 # ==================== ПРОДАЖИ ====================
-
 @app.route('/sales')
 def sales():
     """Продажи"""
@@ -911,7 +905,6 @@ def sales():
     daily = DailySalesSummary.query.order_by(DailySalesSummary.date.desc()).limit(30).all()
     
     return render_template('sales.html', pagination=pagination, daily=daily)
-
 @app.route('/sales/sync', methods=['POST'])
 def sync_sales():
     """Синхронизация продаж со СБИС"""
@@ -996,3 +989,9 @@ def _recalculate_daily_sales():
         db.session.add(summary)
     
     db.session.commit()
+
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5001)
+
+# ==================== ОСТАТКИ (КЕГИ) ====================
