@@ -10,7 +10,7 @@
   </form>
   <form method="post" action="{{ url_for('v8_sync_docs') }}" class="mb-3">
     <input type="hidden" name="days" value="30">
-    <button type="submit" class="btn btn-success">Синхронизировать</button>
+    <button type="submit" class="btn btn-success" onclick="this.form.submit(); return false;">Синхронизировать</button>
   </form>
   <table class="table table-striped">
     <thead><tr><th>Дата</th><th>№</th><th>Номенклатура</th><th>Кол-во</th><th>Ед.</th><th>Цена</th><th>Сумма</th><th>AlcCode</th><th>Связь</th></tr></thead>
