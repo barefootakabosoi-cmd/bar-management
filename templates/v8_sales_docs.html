@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Розничные продажи{% endblock %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Розничные продажи (ДокОтгрИсх)</h2>
+  <form method="get" class="row g-3 mb-3">
+    <div class="col-auto"><input type="date" name="start" class="form-control" value="{{ start }}"></div>
+    <div class="col-auto"><input type="date" name="end" class="form-control" value="{{ end }}"></div>
+    <div class="col-auto"><button type="submit" class="btn btn-primary">Фильтр</button></div>
+  </form>
+  <table class="table table-striped">
+    <thead><tr><th>Дата</th><th>Документ</th><th>Товар</th><th>Кол-во</th><th>Цена</th><th>Сумма</th></tr></thead>
+    <tbody>
+    {% for item in items %}
+      <tr>
+        <td>{{ item.document.doc_date.strftime('%d.%m.%Y') if item.document and item.document.doc_date else '-' }}</td>
+        <td>{{ item.document.doc_number or '-' }}</td>
+        <td>{{ item.product_name or '-' }}</td>
+        <td>{{ item.quantity or 0 }} {{ item.unit or '' }}</td>
+        <td>{{ "%.2f"|format(item.price or 0) }} ₽</td>
+        <td>{{ "%.2f"|format(item.total or 0) }} ₽</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6" class="text-center text-muted">Нет данных</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

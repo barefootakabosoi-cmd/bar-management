@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Вскрытия кег{% endblock %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Вскрытия кег (DocOpening)</h2>
+  <form method="get" class="row g-3 mb-3">
+    <div class="col-auto"><input type="date" name="start" class="form-control" value="{{ start }}"></div>
+    <div class="col-auto"><input type="date" name="end" class="form-control" value="{{ end }}"></div>
+    <div class="col-auto"><button type="submit" class="btn btn-primary">Фильтр</button></div>
+  </form>
+  <form method="post" action="{{ url_for('v8_sync_docs') }}" class="mb-3">
+    <input type="hidden" name="days" value="30">
+    <button type="submit" class="btn btn-success" onclick="this.form.submit(); return false;">Синхронизировать</button>
+  </form>
+  <table class="table table-striped">
+    <thead><tr><th>Дата</th><th>№</th><th>Номенклатура</th><th>Кол-во</th><th>Ед.</th><th>Цена</th><th>Сумма</th><th>AlcCode</th><th>Связь</th></tr></thead>
+    <tbody>
+    {% for item in items %}
+      <tr>
+        <td>{{ item.doc_date.strftime('%d.%m.%Y') if item.doc_date else '-' }}</td>
+        <td>{{ item.doc_number or '-' }}</td>
+        <td>{{ item.name or '-' }}</td>
+        <td>{{ item.quantity or 0 }}</td>
+        <td>{{ item.unit or '-' }}</td>
+        <td>{{ "%.2f"|format(item.price or 0) }} ₽</td>
+        <td>{{ "%.2f"|format(item.sum or 0) }} ₽</td>
+        <td><code>{{ item.alc_code or '-' }}</code></td>
+        <td>{% if item.is_mapped %}<span class="badge bg-success">{{ item.mapped_retail_name }}</span>{% else %}<span class="badge bg-secondary">Не связана</span>{% endif %}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="9" class="text-center text-muted">Нет данных</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
