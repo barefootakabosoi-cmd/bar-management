@@ -354,11 +354,11 @@ class SbisAPI:
 
     def get_writeoffs(self, start_date, end_date):
         """Акты списания — через ДатаС/ДатаПо"""
-        return self.get_documents('АктСписания', start_date, end_date)
+        return self.get_documents_period('АктСписания', start_date, end_date)
 
     def get_sales_docs(self, start_date, end_date):
         """Розничные продажи (ДокОтгрИсх) — через ДатаС/ДатаПо"""
-        return self.get_documents('ДокОтгрИсх', start_date, end_date)
+        return self.get_documents_period('ДокОтгрИсх', start_date, end_date)
 
     def get_doc_items_from_attachment(self, doc_id, doc_type):
         """Номенклатура из ВложениеУчета (XML)"""

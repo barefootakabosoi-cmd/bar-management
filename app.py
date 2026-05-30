@@ -6,6 +6,7 @@ from werkzeug.utils import secure_filename
 import os
 import json
 import pandas as pd
+import threading
 from io import BytesIO
 
 from config import Config
@@ -1001,80 +1002,116 @@ def v8_sales_docs():
     ).order_by(SBISDocument.doc_date.desc()).all()
     return render_template('v8_sales_docs.html', items=items, start=start, end=end)
 
+def _sync_docs_background(app_config, days):
+    """Фоновая синхронизация документов СБИС"""
+    with app.app_context():
+        try:
+            sbis = create_sbis_api_from_config(app_config)
+            if not sbis.authenticate():
+                print("[v8_sync] Auth failed")
+                return
+
+            end = datetime.now()
+            start = end - timedelta(days=days)
+            results = {}
+
+            # 1. DocOpening
+            print(f"[v8_sync] Fetching DocOpening...")
+            openings = sbis.get_doc_openings(start, end)
+            print(f"[v8_sync] DocOpening total: {len(openings)}")
+            
+            existing_numbers = {ko.doc_number for ko in KegOpening.query.all()}
+            new_openings = [op for op in openings if op.get("Номер") not in existing_numbers]
+            print(f"[v8_sync] New DocOpening: {len(new_openings)}")
+            
+            try:
+                for op in new_openings:
+                    op_id = op["Идентификатор"]
+                    rels = sbis.get_doc_relations(op_id, "DocOpening")
+                    items = []
+                    for cons in rels["consequence"]:
+                        if cons["type"] == "АктСписания":
+                            items = sbis.get_doc_items_from_attachment(cons["id"], "АктСписания")
+                            break
+                    for item in items:
+                        ko = KegOpening(
+                            doc_number=op.get("Номер"),
+                            doc_date=datetime.strptime(op.get("Дата", ""), "%d.%m.%Y") if op.get("Дата") else None,
+                            name=item["name"], quantity=item["quantity"], unit=item["unit"],
+                            price=item["price"], sum=item["sum"], sku=item.get("sku", ""),
+                            alc_code=item.get("alc_code", ""), gtin=item.get("gtin", "")
+                        )
+                        db.session.add(ko)
+                results["openings"] = len(new_openings)
+            except Exception as e:
+                print(f"[v8_sync] ERROR in DocOpening loop: {e}")
+                import traceback
+                traceback.print_exc()
+
+            writeoffs = sbis.get_writeoffs(start, end)
+            # 2. АктСписания
+            print(f"[v8_sync] Writeoffs total: {len(writeoffs)}")
+            
+            existing_wo_numbers = {wo.doc_number for wo in Writeoff.query.all()}
+            new_writeoffs = [doc for doc in writeoffs if doc.get("Номер") not in existing_wo_numbers]
+            print(f"[v8_sync] New Writeoffs: {len(new_writeoffs)}")
+            
+            try:
+                for i, doc in enumerate(new_writeoffs):
+                    if i % 50 == 0:
+                        print(f"[v8_sync] Processing writeoff {i}/{len(new_writeoffs)}...")
+                    doc_id = doc["Идентификатор"]
+                    note = doc.get("Примечание", "")
+                    wtype = "прочее"
+                    if "отключении" in note.lower() or "крана" in note.lower():
+                        wtype = "отключение_крана"
+                    elif "брак" in note.lower():
+                        wtype = "брак"
+                    items = sbis.get_doc_items_from_attachment(doc_id, "АктСписания")
+                    for item in items:
+                        wo = Writeoff(
+                            doc_number=doc.get("Номер"),
+                            doc_date=datetime.strptime(doc.get("Дата", ""), "%d.%m.%Y") if doc.get("Дата") else None,
+                            writeoff_type=wtype, note=note,
+                            name=item["name"], quantity=item["quantity"], unit=item["unit"],
+                            price=item["price"], sum=item["sum"],
+                            sku=item.get("sku", ""), alc_code=item.get("alc_code", "")
+                        )
+                        db.session.add(wo)
+                results["writeoffs"] = len(new_writeoffs)
+            except Exception as e:
+                print(f"[v8_sync] ERROR in Writeoff loop: {e}")
+                import traceback
+                traceback.print_exc()
+
+            db.session.commit()
+            print(f"[v8_sync] Done: {results}")
+
+        except Exception as e:
+            db.session.rollback()
+            print(f"[v8_sync] Error: {e}")
+            import traceback
+            traceback.print_exc()
+
+
 @app.route('/v8/sync-docs', methods=['POST'])
 def v8_sync_docs():
-    """Синхронизация DocOpening, АктСписания, ДокОтгрИсх"""
+    """Запуск фоновой синхронизации DocOpening, АктСписания, ДокОтгрИсх"""
     try:
-        api = SbisAPI()
-        if not api.authenticate():
-            # Пробуем через sbis_retail_api
-            from sbis_retail_api import SbisRetailAPI
-            api = SbisRetailAPI(
-                token=Config.SBIS_TOKEN,
-                client_id=Config.SBIS_CLIENT_ID,
-                app_secret=Config.SBIS_APP_SECRET,
-                secret_key=Config.SBIS_SECRET_KEY
-            )
-            api.authenticate()
-            # Используем его headers
-            api.headers = {'X-SBISAccessToken': api.token, 'Content-Type': 'application/json'}
-
         days = request.form.get('days', 30, type=int)
-        end = datetime.now()
-        start = end - timedelta(days=days)
-
-        results = {}
-
-        # 1. DocOpening
-        openings = api.get_doc_openings(start, end)
-        for op in openings:
-            op_id = op['Идентификатор']
-            rels = api.get_doc_relations(op_id, 'DocOpening')
-            items = []
-            for cons in rels['consequence']:
-                if cons['type'] == 'АктСписания':
-                    items = api.get_doc_items_from_attachment(cons['id'], 'АктСписания')
-                    break
-            for item in items:
-                ko = KegOpening(
-                    doc_number=op.get('Номер'),
-                    doc_date=datetime.strptime(op.get('Дата', ''), '%d.%m.%Y') if op.get('Дата') else None,
-                    name=item['name'], quantity=item['quantity'], unit=item['unit'],
-                    price=item['price'], sum=item['sum'], sku=item.get('sku', ''),
-                    alc_code=item.get('alc_code', ''), gtin=item.get('gtin', '')
-                )
-                db.session.add(ko)
-        results['openings'] = len(openings)
-
-        # 2. АктСписания
-        writeoffs = api.get_writeoffs(start, end)
-        for doc in writeoffs:
-            doc_id = doc['Идентификатор']
-            note = doc.get('Примечание', '')
-            wtype = 'прочее'
-            if 'отключении' in note.lower() or 'крана' in note.lower():
-                wtype = 'отключение_крана'
-            elif 'брак' in note.lower():
-                wtype = 'брак'
-            items = api.get_doc_items_from_attachment(doc_id, 'АктСписания')
-            for item in items:
-                wo = Writeoff(
-                    doc_number=doc.get('Номер'),
-                    doc_date=datetime.strptime(doc.get('Дата', ''), '%d.%m.%Y') if doc.get('Дата') else None,
-                    writeoff_type=wtype, note=note,
-                    name=item['name'], quantity=item['quantity'], unit=item['unit'],
-                    price=item['price'], sum=item['sum'],
-                    sku=item.get('sku', ''), alc_code=item.get('alc_code', '')
-                )
-                db.session.add(wo)
-        results['writeoffs'] = len(writeoffs)
-
-        db.session.commit()
-        flash(f"Синхронизировано: {results}", 'success')
+        
+        # Запускаем в фоновом потоке
+        thread = threading.Thread(
+            target=_sync_docs_background,
+            args=(app.config, days)
+        )
+        thread.daemon = True
+        thread.start()
+        
+        flash(f"Синхронизация запущена (дней: {days}). Обновите страницу через минуту.", 'success')
 
     except Exception as e:
-        db.session.rollback()
-        flash(f"Ошибка синхронизации: {str(e)}", 'danger')
+        flash(f"Ошибка запуска синхронизации: {str(e)}", 'danger')
 
     return redirect(url_for('v8_openings'))
 
