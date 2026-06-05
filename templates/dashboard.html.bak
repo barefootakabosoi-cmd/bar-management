@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bar Management — Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <span class="logo-icon">🍺</span>
+                <span class="logo-text">Bar<span class="logo-accent">Ctrl</span></span>
+            </div>
+            <nav class="nav">
+                <a href="/" class="nav-item active">
+                    <span class="nav-icon">📊</span>
+                    <span>Дашборд</span>
+                </a>
+                <a href="/kegs" class="nav-item">
+                    <span class="nav-icon">🍺</span>
+                    <span>Кеги</span>
+                </a>
+                <a href="/recipes" class="nav-item">
+                    <span class="nav-icon">🍔</span>
+                    <span>Рецепты</span>
+                </a>
+                <a href="/prices" class="nav-item">
+                    <span class="nav-icon">💰</span>
+                    <span>Прайсы</span>
+                </a>
+                <a href="/suppliers" class="nav-item">
+                    <span class="nav-icon">📦</span>
+                    <span>Поставщики</span>
+                </a>
+                <a href="/bartenders" class="nav-item">
+                    <span class="nav-icon">👤</span>
+                    <span>Бармены</span>
+                </a>
+                <a href="/shifts" class="nav-item">
+                    <span class="nav-icon">📅</span>
+                    <span>Смены</span>
+                </a>
+                <a href="/analytics" class="nav-item">
+                    <span class="nav-icon">📈</span>
+                    <span>Аналитика</span>
+                </a>
+                <a href="/expenses" class="nav-item">
+                    <span class="nav-icon">💸</span>
+                    <span>Расходы</span>
+                </a>
+                <a href="/alerts" class="nav-item">
+                    <span class="nav-icon">🔔</span>
+                    <span>Алерты</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <form action="/sbis/sync" method="POST" class="sync-form">
+                    <input type="hidden" name="sync_type" value="incremental">
+                    <button type="submit" class="btn-sync">
+                        <span>🔄</span>
+                        <span>Синхронизировать СБИС</span>
+                    </button>
+                </form>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main">
+            <!-- Top Bar -->
+            <header class="topbar">
+                <h1 class="page-title">Дашборд</h1>
+                <div class="topbar-actions">
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" placeholder="Поиск товаров, рецептов..." id="globalSearch">
+                    </div>
+                    <div class="user-menu">
+                        <span class="date">{{ now.strftime('%d %B %Y') if now else '15 мая 2026' }}</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Stats Cards -->
+            <section class="stats-grid">
+                <div class="stat-card stat-purchases">
+                    <div class="stat-icon">📦</div>
+                    <div class="stat-info">
+                        <div class="stat-label">Кеги всего</div>
+                        <div class="stat-value"><span id="kegs_total">—</span></div>
+                        <div class="stat-change">Активных: <span id="kegs_active">—</span> • Пустых: <span id="kegs_empty">—</span></div>
+                    </div>
+                </div>
+                <div class="stat-card stat-revenue">
+                    <div class="stat-icon">💰</div>
+                    <div class="stat-info">
+                        <div class="stat-label">Рецепты</div>
+                        <div class="stat-value"><span id="recipes_total">—</span></div>
+                        <div class="stat-change">В плюс: <span id="recipes_profitable">—</span> • В минус: <span id="recipes_unprofitable">—</span></div>
+                    </div>
+                </div>
+                <div class="stat-card stat-promo">
+                    <div class="stat-icon">⚡</div>
+                    <div class="stat-info">
+                        <div class="stat-label">Поставщики</div>
+                        <div class="stat-value"><span id="suppliers_total">—</span></div>
+                        <div class="stat-change">С предложениями: <span id="suppliers_with_offers">—</span></div>
+                    </div>
+                </div>
+                <div class="stat-card stat-alerts">
+                    <div class="stat-icon">🔔</div>
+                    <div class="stat-info">
+                        <div class="stat-label">Алерты цен</div>
+                        <div class="stat-value"><span id="prices_active_alerts">—</span></div>
+                        <div class="stat-change" id="prices_alerts_status">—</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Kegs Section -->
+            <section class="kegs-section">
+                <div class="section-header">
+                    <h2>🍺 16 кранов</h2>
+                    <div class="keg-legend">
+                        <span class="legend-item"><span class="dot dot-full"></span> Полный</span>
+                        <span class="legend-item"><span class="dot dot-active"></span> Работает</span>
+                        <span class="legend-item"><span class="dot dot-warning"></span> &lt;10л</span>
+                        <span class="legend-item"><span class="dot dot-low"></span> &lt;5л</span>
+                        <span class="legend-item"><span class="dot dot-empty"></span> Пустой</span>
+                    </div>
+                </div>
+                <div class="kegs-grid">
+                    {% for keg in kegs %}
+                    <div class="keg-card keg-{{ keg.status }}" data-tap="{{ keg.tap_number }}">
+                        <div class="keg-tap-number">#{{ keg.tap_number }}</div>
+                        <div class="keg-visual">
+                            <div class="keg-body">
+                                <div class="keg-liquid" style="height: {{ keg.percent_remaining }}%;"></div>
+                                <div class="keg-bubbles"></div>
+                            </div>
+                            <div class="keg-tap-handle"></div>
+                        </div>
+                        <div class="keg-info">
+                            <div class="keg-name">{{ keg.beer_name or 'Пусто' }}</div>
+                            <div class="keg-brand">{{ keg.beer_brand or '' }}</div>
+                            <div class="keg-stats">
+                                <span class="keg-volume">{{ "%.1f".format(keg.remaining_liters) }}л / {{ "%.0f".format(keg.volume_liters) }}л</span>
+                                <span class="keg-percent">{{ "%.0f".format(keg.percent_remaining) }}%</span>
+                            </div>
+                            {% if keg.is_low %}
+                            <div class="keg-alert">⚠️ Заканчивается!</div>
+                            {% endif %}
+                            {% if keg.days_until_empty %}
+                            <div class="keg-forecast">~{{ keg.days_until_empty }} дн.</div>
+                            {% endif %}
+                        </div>
+                        <div class="keg-actions">
+                            <button class="btn-keg-action" onclick="showKegModal({{ keg.tap_number }})" title="Установить кег">
+                                🔄
+                            </button>
+                            <button class="btn-keg-action" onclick="showLevelModal({{ keg.tap_number }})" title="Обновить уровень">
+                                📏
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <!-- Bottom Grid -->
+            <section class="bottom-grid">
+                <!-- Current Shift -->
+                <div class="panel panel-shift">
+                    <div class="panel-header">
+                        <h3>👤 Текущая смена</h3>
+                    </div>
+                    <div class="panel-body">
+                        {% if current_shift %}
+                        <div class="shift-info">
+                            <div class="shift-bartender">{{ current_shift.bartender.name }}</div>
+                            <div class="shift-time">
+                                {{ current_shift.start_time.strftime('%H:%M') }} — 
+                                {{ current_shift.end_time.strftime('%H:%M') if current_shift.end_time else '...' }}
+                            </div>
+                            <div class="shift-status active">На смене</div>
+                        </div>
+                        {% else %}
+                        <div class="shift-empty">
+                            <div class="shift-empty-icon">😴</div>
+                            <div>Сейчас никого нет</div>
+                            <a href="/shifts" class="btn-sm">Расписание →</a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- SBIS Panel -->
+                <div class="panel panel-sbis">
+                    <div class="panel-header"><h3>📄 СБИС</h3></div>
+                    <div class="panel-body">
+                        <div>Последняя синхронизация: <span id="sbis_last_sync">—</span></div>
+                        <div>Документов сегодня: <span id="sbis_documents_today">—</span></div>
+                    </div>
+                </div>
+
+                <!-- Recipe Costs -->
+                <div class="panel panel-recipes">
+                    <div class="panel-header">
+                        <h3>🍔 Себестоимость блюд</h3>
+                        <a href="/recipes" class="btn-sm">Все рецепты →</a>
+                    </div>
+                    <div class="panel-body">
+                        {% if recipes %}
+                        <div class="recipe-list">
+                            {% for recipe in recipes[:5] %}
+                            <div class="recipe-row">
+                                <div class="recipe-name">{{ recipe.name }}</div>
+                                <div class="recipe-costs">
+                                    <span class="cost-seb">{{ "%.0f".format(recipe.total_cost) }} ₽</span>
+                                    <span class="cost-sale">{{ "%.0f".format(recipe.sale_price) }} ₽</span>
+                                    <span class="cost-margin {% if recipe.margin_percent > 50 %}good{% elif recipe.margin_percent > 30 %}ok{% else %}bad{% endif %}">
+                                        {{ "%.0f".format(recipe.margin_percent) }}%
+                                    </span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="empty-state">Нет активных рецептов</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Alerts -->
+                <div class="panel panel-alerts">
+                    <div class="panel-header">
+                        <h3>🔔 Последние алерты</h3>
+                        <a href="/alerts" class="btn-sm">Все →</a>
+                    </div>
+                    <div class="panel-body">
+                        {% if alerts %}
+                        <div class="alert-list">
+                            {% for alert in alerts %}
+                            <div class="alert-item alert-{{ alert.severity }}">
+                                <div class="alert-icon">
+                                    {% if alert.type == 'price_increase' %}📈{% elif alert.type == 'keg_low' %}🍺{% elif alert.type == 'promo' %}⚡{% else %}🔔{% endif %}
+                                </div>
+                                <div class="alert-content">
+                                    <div class="alert-title">{{ alert.title }}</div>
+                                    <div class="alert-message">{{ alert.message }}</div>
+                                    <div class="alert-time">{{ alert.created_at.strftime('%H:%M') }}</div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="empty-state">Нет активных алертов</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </section>
+        {% include 'dashboard_stats_v2_snippet.html' %}
+</main>
+    </div>
+
+    <!-- Keg Install Modal -->
+    <div id="kegModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Установить кег <span id="modalTapNumber"></span></h3>
+                <button class="modal-close" onclick="closeModal('kegModal')">&times;</button>
+            </div>
+            <form action="" method="POST" id="kegForm">
+                <div class="form-group">
+                    <label>Пиво</label>
+                    <select name="beer_id" class="form-select" required>
+                        <option value="">Выберите пиво...</option>
+                        {% for beer in beers|default([]) %}
+                        <option value="{{ beer.id }}">{{ beer.name }} ({{ beer.brand }}) — {{ beer.base_price }} ₽</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Объём кега (л)</label>
+                    <input type="number" name="volume" value="30" step="0.5" class="form-input">
+                </div>
+                <button type="submit" class="btn-primary">Установить</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Level Update Modal -->
+    <div id="levelModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Обновить уровень <span id="levelTapNumber"></span></h3>
+                <button class="modal-close" onclick="closeModal('levelModal')">&times;</button>
+            </div>
+            <form action="" method="POST" id="levelForm">
+                <div class="form-group">
+                    <label>Остаток (литров)</label>
+                    <input type="number" name="remaining" step="0.1" min="0" class="form-input" required>
+                </div>
+                <button type="submit" class="btn-primary">Сохранить</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

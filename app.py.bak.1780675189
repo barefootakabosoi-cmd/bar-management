@@ -948,7 +948,7 @@ def sync_sales():
 
 def _recalculate_daily_sales():
     """Пересчёт дневных агрегатов продаж"""
-    from sqlalchemy import func, cast, Date
+    from sqlalchemy import func, cast, Date, distinct, or_
     
     DailySalesSummary.query.delete()
     
@@ -1180,48 +1180,3 @@ def api_health():
         return jsonify(status='ok')
     except Exception:
         return {'status': 'ok'}
-
-@app.route('/api/dashboard/stats_v2', methods=['GET'])
-def dashboard_stats_v2():
-    # TODO: replace stubs with real data sources
-    kegs_total = 16
-    kegs_active = 16
-    kegs_empty = 0
-
-    recipes_total = 0
-    recipes_profitable = 0
-    recipes_unprofitable = 0
-
-    suppliers_total = 0
-    suppliers_with_offers = 0
-
-    prices_active_alerts = 0
-    prices_alerts_status = "ok"
-
-    sbis_last_sync = None
-    sbis_documents_today = 0
-
-    return jsonify({
-        "kegs": {
-            "total": kegs_total,
-            "active": kegs_active,
-            "empty": kegs_empty
-        },
-        "recipes": {
-            "total": recipes_total,
-            "profitable": recipes_profitable,
-            "unprofitable": recipes_unprofitable
-        },
-        "suppliers": {
-            "total": suppliers_total,
-            "with_offers": suppliers_with_offers
-        },
-        "prices": {
-            "active_alerts": prices_active_alerts,
-            "alerts_status": prices_alerts_status
-        },
-        "sbis": {
-            "last_sync": sbis_last_sync,
-            "documents_today": sbis_documents_today
-        }
-    })
