@@ -56,9 +56,6 @@
                 <a href="/alerts" class="nav-item">
                     <span class="nav-icon">🔔</span>
                     <span>Алерты</span>
-                    {% if alert_count > 0 %}
-                    <span class="nav-badge">{{ alert_count }}</span>
-                    {% endif %}
                 </a>
             </nav>
             <div class="sidebar-footer">
@@ -93,35 +90,33 @@
                 <div class="stat-card stat-purchases">
                     <div class="stat-icon">📦</div>
                     <div class="stat-info">
-                        <div class="stat-label">Закупки сегодня</div>
-                        <div class="stat-value">{{ "{:,.0f}".format(today_purchases).replace(',', ' ') }} ₽</div>
-                        <div class="stat-change">+12% к вчера</div>
+                        <div class="stat-label">Кеги всего</div>
+                        <div class="stat-value"><span id="kegs_total">—</span></div>
+                        <div class="stat-change">Активных: <span id="kegs_active">—</span> • Пустых: <span id="kegs_empty">—</span></div>
                     </div>
                 </div>
                 <div class="stat-card stat-revenue">
                     <div class="stat-icon">💰</div>
                     <div class="stat-info">
-                        <div class="stat-label">Выручка месяца</div>
-                        <div class="stat-value">—</div>
-                        <div class="stat-change">Интеграция СБИС</div>
+                        <div class="stat-label">Рецепты</div>
+                        <div class="stat-value"><span id="recipes_total">—</span></div>
+                        <div class="stat-change">В плюс: <span id="recipes_profitable">—</span> • В минус: <span id="recipes_unprofitable">—</span></div>
                     </div>
                 </div>
                 <div class="stat-card stat-promo">
                     <div class="stat-icon">⚡</div>
                     <div class="stat-info">
-                        <div class="stat-label">Акций активно</div>
-                        <div class="stat-value">{{ promo_count }}</div>
-                        <div class="stat-change">Экономия на акциях</div>
+                        <div class="stat-label">Поставщики</div>
+                        <div class="stat-value"><span id="suppliers_total">—</span></div>
+                        <div class="stat-change">С предложениями: <span id="suppliers_with_offers">—</span></div>
                     </div>
                 </div>
                 <div class="stat-card stat-alerts">
                     <div class="stat-icon">🔔</div>
                     <div class="stat-info">
-                        <div class="stat-label">Алерты</div>
-                        <div class="stat-value">{{ alert_count }}</div>
-                        <div class="stat-change {% if alert_count > 0 %}danger{% endif %}">
-                            {% if alert_count > 0 %}Требуют внимания{% else %}Всё в порядке{% endif %}
-                        </div>
+                        <div class="stat-label">Алерты цен</div>
+                        <div class="stat-value"><span id="prices_active_alerts">—</span></div>
+                        <div class="stat-change" id="prices_alerts_status">—</div>
                     </div>
                 </div>
             </section>
@@ -200,6 +195,15 @@
                             <a href="/shifts" class="btn-sm">Расписание →</a>
                         </div>
                         {% endif %}
+                    </div>
+                </div>
+
+                <!-- SBIS Panel -->
+                <div class="panel panel-sbis">
+                    <div class="panel-header"><h3>📄 СБИС</h3></div>
+                    <div class="panel-body">
+                        <div>Последняя синхронизация: <span id="sbis_last_sync">—</span></div>
+                        <div>Документов сегодня: <span id="sbis_documents_today">—</span></div>
                     </div>
                 </div>
 

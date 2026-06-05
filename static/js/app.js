@@ -42,15 +42,6 @@ document.querySelectorAll('.keg-card').forEach(card => {
 });
 
 // ─── LIVE UPDATES ───
-function updateDashboardStats() {
-    fetch('/api/dashboard/stats')
-        .then(r => r.json())
-        .then(data => {
-            // Update stats cards if elements exist
-            console.log('Stats updated:', data);
-        })
-        .catch(e => console.error('Stats update failed:', e));
-}
 
 // Update every 30 seconds
 setInterval(updateDashboardStats, 30000);
@@ -122,3 +113,35 @@ document.querySelectorAll('[data-confirm]').forEach(el => {
 });
 
 console.log('Bar Management System loaded 🍺');
+
+// Auto-run on page load
+document.addEventListener('DOMContentLoaded', updateDashboardStats);
+
+function updateDashboardStats() {
+    fetch('/api/dashboard/stats_v2')
+        .then(r => r.json())
+        .then(data => {
+            const $ = (id) => document.getElementById(id);
+            if ($('kegs_total')) $('kegs_total').textContent = data.kegs?.total ?? '—';
+            if ($('kegs_active')) $('kegs_active').textContent = data.kegs?.active ?? '—';
+            if ($('kegs_empty')) $('kegs_empty').textContent = data.kegs?.empty ?? '—';
+
+            if ($('recipes_total')) $('recipes_total').textContent = data.recipes?.total ?? '—';
+            if ($('recipes_profitable')) $('recipes_profitable').textContent = data.recipes?.profitable ?? '—';
+            if ($('recipes_unprofitable')) $('recipes_unprofitable').textContent = data.recipes?.unprofitable ?? '—';
+
+            if ($('suppliers_total')) $('suppliers_total').textContent = data.suppliers?.total ?? '—';
+            if ($('suppliers_with_offers')) $('suppliers_with_offers').textContent = data.suppliers?.with_offers ?? '—';
+
+            if ($('prices_active_alerts')) $('prices_active_alerts').textContent = data.prices?.active_alerts ?? '—';
+            if ($('prices_alerts_status')) {
+                const n = data.prices?.active_alerts || 0;
+                $('prices_alerts_status').textContent = n>0 ? 'Требуют внимания' : 'Всё в порядке';
+                $('prices_alerts_status').className = 'stat-change' + (n>0 ? ' danger' : '');
+            }
+
+            if ($('sbis_last_sync')) $('sbis_last_sync').textContent = data.sbis?.last_sync ?? '—';
+            if ($('sbis_documents_today')) $('sbis_documents_today').textContent = data.sbis?.documents_today ?? '—';
+        })
+        .catch(e => console.error('Stats update failed:', e));
+}

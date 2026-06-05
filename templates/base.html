@@ -47,7 +47,6 @@
                 <a href="/alerts" class="nav-item {% if request.path == '/alerts' %}active{% endif %}">
                     <span class="nav-icon">🔔</span><span>Алерты</span>
                     {% set alert_count = alert_count|default(0) %}
-                    {% if alert_count > 0 %}<span class="nav-badge">{{ alert_count }}</span>{% endif %}
                 </a>
             </nav>
             <div class="sidebar-footer">
