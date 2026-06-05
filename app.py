@@ -10,10 +10,10 @@ import threading
 from io import BytesIO
 
 from config import Config
-from models import db, KegOpening, Writeoff, KegRetailMapping, Keg, ActiveSupplierPrice
-from models import Recipe, RecipeItem, RecipeVersion, Expense, ExpenseCategory
-from models import Bartender, Shift, SBISDocument, SBISDocumentItem, Alert, SyncLog
-from models import StockBalance, SaleRecord, DailySalesSummary
+from models import Supplier, SupplierOffer, db, KegOpening, Writeoff, KegRetailMapping, Keg, ActiveSupplierPrice
+from models import Supplier, SupplierOffer, Recipe, RecipeItem, RecipeVersion, Expense, ExpenseCategory
+from models import Supplier, SupplierOffer, Bartender, Shift, SBISDocument, SBISDocumentItem, Alert, SyncLog
+from models import Supplier, SupplierOffer, StockBalance, SaleRecord, DailySalesSummary
 from sbis_api import create_sbis_api_from_config, get_last_sync_date
 
 app = Flask(__name__)
@@ -1167,3 +1167,16 @@ if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)
 
 # ==================== ОСТАТКИ (КЕГИ) ====================
+
+# --- Healthcheck endpoint (added by setup script) ---
+try:
+    from flask import jsonify
+except Exception:
+    pass
+
+@app.get('/api/health')
+def api_health():
+    try:
+        return jsonify(status='ok')
+    except Exception:
+        return {'status': 'ok'}

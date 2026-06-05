@@ -1,0 +1,9 @@
+bind = "127.0.0.1:5000"
+workers = 2
+worker_class = "sync"
+accesslog = "/tmp/gunicorn_bar_management_access.log"
+errorlog = "/tmp/gunicorn_bar_management_error.log"
+loglevel = "info"
+timeout = 60
+graceful_timeout = 30
+keepalive = 5
