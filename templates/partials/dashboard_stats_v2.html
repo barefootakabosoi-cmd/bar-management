@@ -1,0 +1,24 @@
+<style>
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin: 12px 0 20px; }
+  .stat-card { padding: 12px; border: 1px solid #e3e3e3; border-radius: 8px; background: #fff; }
+  .stat-card .label { font-size: 12px; color: #666; margin-bottom: 6px; }
+  .stat-card .value { font-size: 20px; font-weight: 600; color: #111; }
+</style>
+<div id="dashboard-stats-v2" class="stats-grid">
+  <div class="stat-card"><div class="label">Кеги всего</div><div class="value" id="kegs_total">—</div></div>
+  <div class="stat-card"><div class="label">Кеги активные</div><div class="value" id="kegs_active">—</div></div>
+  <div class="stat-card"><div class="label">Кеги пустые</div><div class="value" id="kegs_empty">—</div></div>
+
+  <div class="stat-card"><div class="label">Рецептов всего</div><div class="value" id="recipes_total">—</div></div>
+  <div class="stat-card"><div class="label">Рентабельные</div><div class="value" id="recipes_profitable">—</div></div>
+  <div class="stat-card"><div class="label">Нерентабельные</div><div class="value" id="recipes_unprofitable">—</div></div>
+
+  <div class="stat-card"><div class="label">Поставщиков</div><div class="value" id="suppliers_total">—</div></div>
+  <div class="stat-card"><div class="label">С офертами</div><div class="value" id="suppliers_with_offers">—</div></div>
+
+  <div class="stat-card"><div class="label">Алерты цен</div><div class="value" id="prices_active_alerts">—</div></div>
+  <div class="stat-card"><div class="label">Статус цен</div><div class="value" id="prices_alerts_status">—</div></div>
+
+  <div class="stat-card"><div class="label">СБИС: последняя синхронизация</div><div class="value" id="sbis_last_sync">—</div></div>
+  <div class="stat-card"><div class="label">СБИС: документов сегодня</div><div class="value" id="sbis_documents_today">—</div></div>
+</div>
