@@ -263,8 +263,7 @@
                     </div>
                 </div>
             </section>
-        {% include 'dashboard_stats_v2_snippet.html' %}
-{% include 'partials/dashboard_stats_v2.html' %}
+  {% include 'partials/dashboard_stats_v2.html' %}
 </main>
     </div>
 
@@ -311,6 +310,34 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js', v=v=20260606) }}"></script>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    fetch("/api/dashboard/stats_v2")
+        .then(r => r.json())
+        .then(data => {
+            const $ = (id) => document.getElementById(id);
+            if ($("kegs_total")) $("kegs_total").textContent = data.kegs?.total ?? "—";
+            if ($("kegs_active")) $("kegs_active").textContent = data.kegs?.active ?? "—";
+            if ($("kegs_empty")) $("kegs_empty").textContent = data.kegs?.empty ?? "—";
+            if ($("recipes_total")) $("recipes_total").textContent = data.recipes?.total ?? "—";
+            if ($("recipes_profitable")) $("recipes_profitable").textContent = data.recipes?.profitable ?? "—";
+            if ($("recipes_unprofitable")) $("recipes_unprofitable").textContent = data.recipes?.unprofitable ?? "—";
+            if ($("suppliers_total")) $("suppliers_total").textContent = data.suppliers?.total ?? "—";
+            if ($("suppliers_with_offers")) $("suppliers_with_offers").textContent = data.suppliers?.with_offers ?? "—";
+            if ($("prices_active_alerts")) $("prices_active_alerts").textContent = data.prices?.active_alerts ?? "—";
+            if ($("prices_alerts_status")) {
+                const n = data.prices?.active_alerts || 0;
+                $("prices_alerts_status").textContent = n>0 ? "Требуют внимания" : "Всё в порядке";
+            }
+            if ($("sbis_last_sync")) $("sbis_last_sync").textContent = data.sbis?.last_sync ?? "—";
+            if ($("sbis_documents_today")) $("sbis_documents_today").textContent = data.sbis?.documents_today ?? "—";
+        })
+        .catch(e => console.error("Inline stats update failed:", e));
+});
+</script>
+
 </body>
 </html>
