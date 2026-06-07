@@ -17,6 +17,9 @@ from models import Supplier, SupplierOffer, StockBalance, SaleRecord, DailySales
 from sbis_api import create_sbis_api_from_config, get_last_sync_date
 
 app = Flask(__name__)
+
+app.config.update(TEMPLATES_AUTO_RELOAD=True, SEND_FILE_MAX_AGE_DEFAULT=0)
+app.jinja_env.auto_reload = True
 app.config.from_object(Config)
 db.init_app(app)
 

@@ -1,0 +1,13 @@
+# Dashboard v2 автопатч
+- Дата: воскресенье,  7 июня 2026 г. 23:54:03 (MSK)
+- Хост/порт: http://127.0.0.1:5013/
+- Сервер-лог: /tmp/bar_mgmt_5013.log
+- Изменения:
+  - Подключён новый partial templates/partials/dashboard_stats_v2.html
+  - Вставлен include в шаблоны (dashboard/base), добавлен cache-busting js/css
+  - Обновлён static/js/app.js: авто-загрузка /api/dashboard/stats_v2 и заполнение метрик
+  - Включён dev no-cache в app.py (TEMPLATES_AUTO_RELOAD, SEND_FILE_MAX_AGE_DEFAULT=0)
+- Проверки:
+  - GET / -> 200, маркеры v2 найдены в HTML
+  - GET /api/dashboard/stats_v2 -> 200
+  - Фрагмент ответа: {   "kegs": {     "active": 16,     "empty": 0,     "total": 16   },   "prices": {     "active_alerts": 0,     "alerts_status": "ok"   },   "recipes": {     "profitable": 0,     "total": 0,     "unprofitable": 0   },   "sbis": {     "documents_today": 0,     "last_sync": null   },   "suppliers": {  

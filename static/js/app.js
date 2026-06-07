@@ -1,3 +1,4 @@
+console.log('app.js v20260606');
 // ─── MODALS ───
 function showKegModal(tapNumber) {
     document.getElementById('modalTapNumber').textContent = '#' + tapNumber;
@@ -122,26 +123,49 @@ function updateDashboardStats() {
         .then(r => r.json())
         .then(data => {
             const $ = (id) => document.getElementById(id);
-            if ($('kegs_total')) $('kegs_total').textContent = data.kegs?.total ?? '—';
-            if ($('kegs_active')) $('kegs_active').textContent = data.kegs?.active ?? '—';
-            if ($('kegs_empty')) $('kegs_empty').textContent = data.kegs?.empty ?? '—';
+            if ($('v2_kegs_total')) $('v2_kegs_total').textContent = data.kegs?.total ?? '—';
+            if ($('v2_kegs_active')) $('v2_kegs_active').textContent = data.kegs?.active ?? '—';
+            if ($('v2_kegs_empty')) $('v2_kegs_empty').textContent = data.kegs?.empty ?? '—';
 
-            if ($('recipes_total')) $('recipes_total').textContent = data.recipes?.total ?? '—';
-            if ($('recipes_profitable')) $('recipes_profitable').textContent = data.recipes?.profitable ?? '—';
-            if ($('recipes_unprofitable')) $('recipes_unprofitable').textContent = data.recipes?.unprofitable ?? '—';
+            if ($('v2_recipes_total')) $('v2_recipes_total').textContent = data.recipes?.total ?? '—';
+            if ($('v2_recipes_profitable')) $('v2_recipes_profitable').textContent = data.recipes?.profitable ?? '—';
+            if ($('v2_recipes_unprofitable')) $('v2_recipes_unprofitable').textContent = data.recipes?.unprofitable ?? '—';
 
-            if ($('suppliers_total')) $('suppliers_total').textContent = data.suppliers?.total ?? '—';
-            if ($('suppliers_with_offers')) $('suppliers_with_offers').textContent = data.suppliers?.with_offers ?? '—';
+            if ($('v2_suppliers_total')) $('v2_suppliers_total').textContent = data.suppliers?.total ?? '—';
+            if ($('v2_suppliers_with_offers')) $('v2_suppliers_with_offers').textContent = data.suppliers?.with_offers ?? '—';
 
-            if ($('prices_active_alerts')) $('prices_active_alerts').textContent = data.prices?.active_alerts ?? '—';
-            if ($('prices_alerts_status')) {
+            if ($('v2_prices_active_alerts')) $('v2_prices_active_alerts').textContent = data.prices?.active_alerts ?? '—';
+            if ($('v2_prices_alerts_status')) {
                 const n = data.prices?.active_alerts || 0;
-                $('prices_alerts_status').textContent = n>0 ? 'Требуют внимания' : 'Всё в порядке';
-                $('prices_alerts_status').className = 'stat-change' + (n>0 ? ' danger' : '');
+                $('v2_prices_alerts_status').textContent = n>0 ? 'Требуют внимания' : 'Всё в порядке';
+                $('v2_prices_alerts_status').className = 'stat-change' + (n>0 ? ' danger' : '');
             }
 
-            if ($('sbis_last_sync')) $('sbis_last_sync').textContent = data.sbis?.last_sync ?? '—';
-            if ($('sbis_documents_today')) $('sbis_documents_today').textContent = data.sbis?.documents_today ?? '—';
+            if ($('v2_sbis_last_sync')) $('v2_sbis_last_sync').textContent = data.sbis?.last_sync ?? '—';
+            if ($('v2_sbis_documents_today')) $('v2_sbis_documents_today').textContent = data.sbis?.documents_today ?? '—';
         })
         .catch(e => console.error('Stats update failed:', e));
 }
+
+
+document.addEventListener('DOMContentLoaded', () => {
+  const fill = (d) => {
+    const m = {
+      kegs_total: d.get?.kegs?.total ?? d.kegs?.total ?? '—',
+      kegs_active: d.get?.kegs?.active ?? d.kegs?.active ?? '—',
+      kegs_empty: d.get?.kegs?.empty ?? d.kegs?.empty ?? '—',
+      recipes_total: d.get?.recipes?.total ?? d.recipes?.total ?? '—',
+      recipes_profitable: d.get?.recipes?.profitable ?? d.recipes?.profitable ?? '—',
+      recipes_unprofitable: d.get?.recipes?.unprofitable ?? d.recipes?.unprofitable ?? '—',
+      suppliers_total: d.get?.suppliers?.total ?? d.suppliers?.total ?? '—',
+      suppliers_with_offers: d.get?.suppliers?.with_offers ?? d.suppliers?.with_offers ?? '—',
+      prices_active_alerts: d.get?.prices?.active_alerts ?? d.prices?.active_alerts ?? '—',
+      sbis_last_sync: d.get?.sbis?.last_sync ?? d.sbis?.last_sync ?? '—',
+      sbis_documents_today: d.get?.sbis?.documents_today ?? d.sbis?.documents_today ?? '—',
+    };
+    for (const [id,v] of Object.entries(m)) { const el=document.getElementById(id); if(el) el.textContent = v; }
+  };
+  const load = () => fetch('/api/dashboard/stats_v2',{cache:'no-store'}).then(r=>r.json()).then(fill).catch(e=>console.warn('stats_v2 fetch failed',e));
+  load(); setInterval(load, 30000);
+});
+
